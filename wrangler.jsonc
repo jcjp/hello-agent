@@ -15,7 +15,7 @@
   "assets": {
     "directory": "./public",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/agents/*", "/oauth/*"]
+    "run_worker_first": ["/api/*", "/agents/*", "/oauth/*"]
   },
   "durable_objects": {
     "bindings": [
@@ -27,7 +27,8 @@
   },
   "kv_namespaces": [
     {
-      "binding": "PRIVATE_CV"
+      "binding": "PRIVATE_CV",
+      "id": "f580fe45196c437a9ead20314dd7946d"
     }
   ],
   "migrations": [
