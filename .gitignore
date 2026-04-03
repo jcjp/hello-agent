@@ -145,5 +145,8 @@ dist
 .dev.vars*
 !.dev.vars.example
 !.env.example
+src/cv-data.ts
+private/
+cv-data.json
 
 .codedb.snapshot

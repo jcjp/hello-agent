@@ -1,17 +1,18 @@
 import {
   Suspense,
   useCallback,
-  useState,
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type ReactNode
 } from "react";
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { type UIMessage } from "ai";
 import type { ChatAgent } from "./server";
-import { cvData, examplePrompts } from "./cv-data";
+import type { PrivateCvData } from "./private-cv";
+import { examplePrompts } from "./example-prompts";
 import { Badge, Button, InputArea, Surface, Text } from "@cloudflare/kumo";
 import { Toasty, useKumoToastManager } from "@cloudflare/kumo/components/toast";
 import { Streamdown } from "streamdown";
@@ -25,8 +26,6 @@ import {
   MoonIcon,
   SunIcon
 } from "@phosphor-icons/react";
-
-// ── Small components ──────────────────────────────────────────────────
 
 function ThemeToggle() {
   const [dark, setDark] = useState(
@@ -106,11 +105,11 @@ function AnimatedToggleContent({
   );
 }
 
-// ── Main chat ─────────────────────────────────────────────────────────
-
 function Chat() {
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState("");
+  const [profile, setProfile] = useState<PrivateCvData | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [showAllSkills, setShowAllSkills] = useState(false);
   const [showAllExperience, setShowAllExperience] = useState(false);
   const [showAllCertifications, setShowAllCertifications] = useState(false);
@@ -168,10 +167,48 @@ function Chat() {
   const isStreaming = status === "streaming" || status === "submitted";
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      try {
+        const response = await fetch("/api/profile");
+        const data: unknown = await response.json();
+
+        if (!response.ok) {
+          const message =
+            typeof data === "object" &&
+            data !== null &&
+            "error" in data &&
+            typeof data.error === "string"
+              ? data.error
+              : "Failed to load CV";
+          throw new Error(message);
+        }
+
+        if (!cancelled) {
+          setProfile(data as PrivateCvData);
+          setProfileError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setProfileError(
+            error instanceof Error ? error.message : "Failed to load CV"
+          );
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Re-focus the input after streaming ends
   useEffect(() => {
     if (!isStreaming && textareaRef.current) {
       textareaRef.current.focus();
@@ -183,19 +220,16 @@ function Chat() {
     if (!text || isStreaming) return;
     setInput("");
 
-    const parts: Array<
-      | { type: "text"; text: string }
-      | { type: "file"; mediaType: string; url: string }
-    > = [];
-    if (text) parts.push({ type: "text", text });
+    sendMessage({
+      role: "user",
+      parts: [{ type: "text", text }]
+    });
 
-    sendMessage({ role: "user", parts });
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   }, [input, isStreaming, sendMessage]);
 
   return (
     <div className="flex flex-col h-screen bg-kumo-elevated relative">
-      {/* Header */}
       <header className="px-5 py-4 bg-kumo-base border-b border-kumo-line">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -230,335 +264,366 @@ function Chat() {
         </div>
       </header>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-5 py-6 space-y-5">
           {messages.length === 0 && (
             <div className="space-y-6">
-              {/* User Profile Card */}
               <Surface className="p-6 rounded-xl bg-gradient-to-br from-kumo-base to-kumo-control border border-kumo-line mx-auto w-full">
-                <div className="space-y-4">
-                  <div>
-                    <h2 className="text-xl font-bold text-kumo-default">
-                      {cvData.name}
+                {!profile && !profileError && (
+                  <div className="text-sm text-kumo-subtle">Loading CV...</div>
+                )}
+
+                {profileError && (
+                  <div className="space-y-2">
+                    <h2 className="text-lg font-semibold text-kumo-default">
+                      CV unavailable
                     </h2>
-                    <p className="text-sm text-kumo-accent font-semibold">
-                      {cvData.title}
-                    </p>
-                    <p className="text-xs text-kumo-inactive mt-1">
-                      {cvData.location}
-                    </p>
-
-                    {/* Contact Links */}
-                    <div className="flex gap-3 text-xs text-kumo-inactive mt-2">
-                      <a
-                        href={`mailto:${cvData.email}`}
-                        className="hover:text-kumo-accent transition"
-                      >
-                        Email
-                      </a>
-                      <a
-                        href={cvData.github}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-kumo-accent transition"
-                      >
-                        GitHub
-                      </a>
-                      <a
-                        href={cvData.gitlab}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-kumo-accent transition"
-                      >
-                        GitLab
-                      </a>
-                    </div>
+                    <p className="text-sm text-kumo-danger">{profileError}</p>
                   </div>
+                )}
 
-                  <p className="text-sm text-kumo-default leading-relaxed">
-                    {cvData.summary}
-                  </p>
-
-                  {/* Key Skills */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Technical Skills
+                {profile && (
+                  <div className="space-y-4">
+                    <div>
+                      <h2 className="text-xl font-bold text-kumo-default">
+                        {profile.name}
+                      </h2>
+                      <p className="text-sm text-kumo-accent font-semibold">
+                        {profile.title}
                       </p>
-                      {Object.values(cvData.skills).flat().length > 20 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowAllSkills(!showAllSkills)}
-                          className="text-xs"
+                      <p className="text-xs text-kumo-inactive mt-1">
+                        {profile.location}
+                      </p>
+
+                      <div className="flex gap-3 text-xs text-kumo-inactive mt-2">
+                        <a
+                          href={`mailto:${profile.email}`}
+                          className="hover:text-kumo-accent transition"
                         >
-                          {showAllSkills ? "Show Less" : "Show More"}
-                        </Button>
-                      )}
+                          Email
+                        </a>
+                        <a
+                          href={profile.github}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-kumo-accent transition"
+                        >
+                          GitHub
+                        </a>
+                        <a
+                          href={profile.gitlab}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-kumo-accent transition"
+                        >
+                          GitLab
+                        </a>
+                      </div>
                     </div>
 
-                    <AnimatedToggleContent
-                      expanded={showAllSkills}
-                      collapsedContent={
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.values(cvData.skills)
-                            .flat()
-                            .slice(0, 20)
-                            .map((skill) => (
-                              <Badge
-                                key={skill}
-                                variant="secondary"
+                    <p className="text-sm text-kumo-default leading-relaxed">
+                      {profile.summary}
+                    </p>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                          Technical Skills
+                        </p>
+                        {Object.values(profile.skills).flat().length > 20 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowAllSkills(!showAllSkills)}
+                            className="text-xs"
+                          >
+                            {showAllSkills ? "Show Less" : "Show More"}
+                          </Button>
+                        )}
+                      </div>
+
+                      <AnimatedToggleContent
+                        expanded={showAllSkills}
+                        collapsedContent={
+                          <div className="flex flex-wrap gap-1.5">
+                            {Object.values(profile.skills)
+                              .flat()
+                              .slice(0, 20)
+                              .map((skill) => (
+                                <Badge
+                                  key={skill}
+                                  variant="secondary"
+                                  className="text-xs"
+                                >
+                                  {skill}
+                                </Badge>
+                              ))}
+                            {Object.values(profile.skills).flat().length >
+                              20 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +
+                                {Object.values(profile.skills).flat().length -
+                                  20}{" "}
+                                more
+                              </Badge>
+                            )}
+                          </div>
+                        }
+                        expandedContent={
+                          <div className="space-y-3 text-xs">
+                            {Object.entries(profile.skills).map(
+                              ([category, skills]) => (
+                                <div key={category}>
+                                  <p className="font-semibold text-kumo-default capitalize mb-1.5">
+                                    {category.replace(/([A-Z])/g, " $1").trim()}
+                                  </p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {skills.map((skill) => (
+                                      <Badge
+                                        key={skill}
+                                        variant="primary"
+                                        className="text-xs"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        }
+                      />
+                    </div>
+
+                    <div className="pt-2 border-t border-kumo-line">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide mb-2">
+                        Languages
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {profile.languages.map((language) => (
+                          <Badge
+                            key={language}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {language}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-kumo-line">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                          Experience
+                        </p>
+                        {profile.experience.length > 3 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setShowAllExperience(!showAllExperience)
+                            }
+                            className="text-xs"
+                          >
+                            {showAllExperience ? "Show Less" : "Show More"}
+                          </Button>
+                        )}
+                      </div>
+
+                      <AnimatedToggleContent
+                        expanded={showAllExperience}
+                        collapsedContent={
+                          <div className="space-y-2">
+                            {profile.experience.slice(0, 3).map((exp) => (
+                              <div
+                                key={exp.company + exp.period}
                                 className="text-xs"
                               >
-                                {skill}
-                              </Badge>
-                            ))}
-                          {Object.values(cvData.skills).flat().length > 20 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{Object.values(cvData.skills).flat().length - 20}{" "}
-                              more
-                            </Badge>
-                          )}
-                        </div>
-                      }
-                      expandedContent={
-                        <div className="space-y-3 text-xs">
-                          {Object.entries(cvData.skills).map(
-                            ([category, skills]) => (
-                              <div key={category}>
-                                <p className="font-semibold text-kumo-default capitalize mb-1.5">
-                                  {category.replace(/([A-Z])/g, " $1").trim()}
+                                <p className="font-semibold text-kumo-default">
+                                  {exp.title}
                                 </p>
-                                <div className="flex flex-wrap gap-1">
-                                  {skills.map((skill) => (
-                                    <Badge
-                                      key={skill}
-                                      variant="primary"
-                                      className="text-xs"
-                                    >
-                                      {skill}
-                                    </Badge>
-                                  ))}
-                                </div>
+                                <p className="text-kumo-accent">
+                                  {exp.company}
+                                </p>
+                                <p className="text-kumo-subtle text-xs">
+                                  {exp.period}
+                                </p>
                               </div>
-                            )
-                          )}
-                        </div>
-                      }
-                    />
-                  </div>
-
-                  {/* Languages */}
-                  <div className="pt-2 border-t border-kumo-line">
-                    <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide mb-2">
-                      Languages
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {cvData.languages.map((language) => (
-                        <Badge
-                          key={language}
-                          variant="secondary"
-                          className="text-xs"
-                        >
-                          {language}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Work Experience */}
-                  <div className="pt-2 border-t border-kumo-line">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Experience
-                      </p>
-                      {cvData.experience.length > 3 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setShowAllExperience(!showAllExperience)
-                          }
-                          className="text-xs"
-                        >
-                          {showAllExperience ? "Show Less" : "Show More"}
-                        </Button>
-                      )}
-                    </div>
-                    <AnimatedToggleContent
-                      expanded={showAllExperience}
-                      collapsedContent={
-                        <div className="space-y-2">
-                          {cvData.experience.slice(0, 3).map((exp) => (
-                            <div
-                              key={exp.company + exp.period}
-                              className="text-xs"
-                            >
-                              <p className="font-semibold text-kumo-default">
-                                {exp.title}
-                              </p>
-                              <p className="text-kumo-accent">{exp.company}</p>
-                              <p className="text-kumo-subtle text-xs">
-                                {exp.period}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      }
-                      expandedContent={
-                        <div className="space-y-2">
-                          {cvData.experience.map((exp) => (
-                            <div
-                              key={exp.company + exp.period}
-                              className="text-xs "
-                            >
-                              <p className="font-semibold text-kumo-default">
-                                {exp.title}
-                              </p>
-                              <p className="text-kumo-accent">{exp.company}</p>
-                              <p className="text-kumo-subtle text-xs">
-                                {exp.period}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      }
-                    />
-                  </div>
-
-                  {/* Education */}
-                  <div className="pt-2 border-t border-kumo-line">
-                    <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide mb-2">
-                      Education
-                    </p>
-                    <div className="text-xs mb-1.5">
-                      <p className="font-semibold text-kumo-default">
-                        {cvData.education[0].degree}
-                        {cvData.education[0].field &&
-                          ` in ${cvData.education[0].field}`}
-                      </p>
-                      <p className="text-kumo-inactive">
-                        {cvData.education[0].school}
-                      </p>
-                      <p className="text-kumo-subtle">
-                        {cvData.education[0].year}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Certifications - Highlighted */}
-                  <div className="pt-2 border-t border-kumo-line">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Certifications
-                      </p>
-                      {cvData.certifications.length > 2 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setShowAllCertifications(!showAllCertifications)
-                          }
-                          className="text-xs"
-                        >
-                          {showAllCertifications ? "Show Less" : "Show More"}
-                        </Button>
-                      )}
-                    </div>
-                    <AnimatedToggleContent
-                      expanded={showAllCertifications}
-                      collapsedContent={
-                        <div className="space-y-2">
-                          {cvData.certifications.slice(0, 2).map((cert) => (
-                            <div
-                              key={cert.name}
-                              className="p-2 rounded bg-kumo-control border border-kumo-accent"
-                            >
-                              <p className="text-xs font-semibold text-kumo-default">
-                                {cert.name}
-                              </p>
-                              <p className="text-xs text-kumo-accent">
-                                {cert.issuer}
-                              </p>
-                              {cert.description && (
-                                <p className="text-xs text-kumo-subtle mt-1">
-                                  {cert.description}
+                            ))}
+                          </div>
+                        }
+                        expandedContent={
+                          <div className="space-y-2">
+                            {profile.experience.map((exp) => (
+                              <div
+                                key={exp.company + exp.period}
+                                className="text-xs"
+                              >
+                                <p className="font-semibold text-kumo-default">
+                                  {exp.title}
                                 </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      }
-                      expandedContent={
-                        <div className="space-y-2">
-                          {cvData.certifications.map((cert) => (
-                            <div
-                              key={cert.name}
-                              className="p-2 rounded bg-kumo-control border border-kumo-accent "
-                            >
-                              <p className="text-xs font-semibold text-kumo-default">
-                                {cert.name}
-                              </p>
-                              <p className="text-xs text-kumo-accent">
-                                {cert.issuer}
-                              </p>
-                              {cert.description && (
-                                <p className="text-xs text-kumo-subtle mt-1">
-                                  {cert.description}
+                                <p className="text-kumo-accent">
+                                  {exp.company}
                                 </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      }
-                    />
-                    <p className="text-xs text-kumo-default mt-3">
-                      <span className="font-semibold">
-                        {cvData.certifications.length}
-                      </span>{" "}
-                      Total Professional Certifications
-                    </p>
-                    <p className="text-xs text-kumo-default mt-1">
-                      <span className="font-semibold">
-                        {cvData.trainings.length}
-                      </span>{" "}
-                      Online Trainings Completed
-                    </p>
-                  </div>
-
-                  {/* Achievements */}
-                  <div className="pt-2 border-t border-kumo-line">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Achievements
-                      </p>
-                      {cvData.achievements.length > 2 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            setShowAllAchievements(!showAllAchievements)
-                          }
-                          className="text-xs"
-                        >
-                          {showAllAchievements ? "Show Less" : "Show More"}
-                        </Button>
-                      )}
+                                <p className="text-kumo-subtle text-xs">
+                                  {exp.period}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        }
+                      />
                     </div>
-                    <p className="text-xs text-kumo-default">
-                      <span className="font-semibold">
-                        {cvData.achievements.length}
-                      </span>{" "}
-                      Awards & Honors
-                    </p>
-                    <AnimatedToggleContent
-                      expanded={showAllAchievements}
-                      collapsedContent={
-                        <div className="mt-2 space-y-1">
-                          {cvData.achievements
-                            .slice(0, 2)
-                            .map((achievement, i) => (
+
+                    <div className="pt-2 border-t border-kumo-line">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide mb-2">
+                        Education
+                      </p>
+                      <div className="text-xs mb-1.5">
+                        <p className="font-semibold text-kumo-default">
+                          {profile.education[0].degree}
+                          {profile.education[0].field &&
+                            ` in ${profile.education[0].field}`}
+                        </p>
+                        <p className="text-kumo-inactive">
+                          {profile.education[0].school}
+                        </p>
+                        <p className="text-kumo-subtle">
+                          {profile.education[0].year}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-kumo-line">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                          Certifications
+                        </p>
+                        {profile.certifications.length > 2 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setShowAllCertifications(!showAllCertifications)
+                            }
+                            className="text-xs"
+                          >
+                            {showAllCertifications ? "Show Less" : "Show More"}
+                          </Button>
+                        )}
+                      </div>
+
+                      <AnimatedToggleContent
+                        expanded={showAllCertifications}
+                        collapsedContent={
+                          <div className="space-y-2">
+                            {profile.certifications.slice(0, 2).map((cert) => (
+                              <div
+                                key={cert.name}
+                                className="p-2 rounded bg-kumo-control border border-kumo-accent"
+                              >
+                                <p className="text-xs font-semibold text-kumo-default">
+                                  {cert.name}
+                                </p>
+                                <p className="text-xs text-kumo-accent">
+                                  {cert.issuer}
+                                </p>
+                                {cert.description && (
+                                  <p className="text-xs text-kumo-subtle mt-1">
+                                    {cert.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        }
+                        expandedContent={
+                          <div className="space-y-2">
+                            {profile.certifications.map((cert) => (
+                              <div
+                                key={cert.name}
+                                className="p-2 rounded bg-kumo-control border border-kumo-accent"
+                              >
+                                <p className="text-xs font-semibold text-kumo-default">
+                                  {cert.name}
+                                </p>
+                                <p className="text-xs text-kumo-accent">
+                                  {cert.issuer}
+                                </p>
+                                {cert.description && (
+                                  <p className="text-xs text-kumo-subtle mt-1">
+                                    {cert.description}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        }
+                      />
+
+                      <p className="text-xs text-kumo-default mt-3">
+                        <span className="font-semibold">
+                          {profile.certifications.length}
+                        </span>{" "}
+                        Total Professional Certifications
+                      </p>
+                      <p className="text-xs text-kumo-default mt-1">
+                        <span className="font-semibold">
+                          {profile.trainings.length}
+                        </span>{" "}
+                        Online Trainings Completed
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-kumo-line">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                          Achievements
+                        </p>
+                        {profile.achievements.length > 2 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setShowAllAchievements(!showAllAchievements)
+                            }
+                            className="text-xs"
+                          >
+                            {showAllAchievements ? "Show Less" : "Show More"}
+                          </Button>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-kumo-default">
+                        <span className="font-semibold">
+                          {profile.achievements.length}
+                        </span>{" "}
+                        Awards & Honors
+                      </p>
+                      <AnimatedToggleContent
+                        expanded={showAllAchievements}
+                        collapsedContent={
+                          <div className="mt-2 space-y-1">
+                            {profile.achievements
+                              .slice(0, 2)
+                              .map((achievement, i) => (
+                                <p
+                                  key={i}
+                                  className="text-xs text-kumo-default"
+                                >
+                                  <span className="font-semibold">
+                                    {achievement.title}
+                                  </span>{" "}
+                                  ({achievement.year})
+                                </p>
+                              ))}
+                          </div>
+                        }
+                        expandedContent={
+                          <div className="mt-2 space-y-1">
+                            {profile.achievements.map((achievement, i) => (
                               <p key={i} className="text-xs text-kumo-default">
                                 <span className="font-semibold">
                                   {achievement.title}
@@ -566,82 +631,70 @@ function Chat() {
                                 ({achievement.year})
                               </p>
                             ))}
-                        </div>
-                      }
-                      expandedContent={
-                        <div className="mt-2 space-y-1">
-                          {cvData.achievements.map((achievement, i) => (
-                            <p key={i} className="text-xs text-kumo-default ">
-                              <span className="font-semibold">
-                                {achievement.title}
-                              </span>{" "}
-                              ({achievement.year})
-                            </p>
-                          ))}
-                        </div>
-                      }
-                    />
-                  </div>
-
-                  {/* Key Projects */}
-                  <div className="pt-2 border-t border-kumo-line">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Projects
-                      </p>
-                      {cvData.keyProjects.length > 4 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowAllProjects(!showAllProjects)}
-                          className="text-xs"
-                        >
-                          {showAllProjects ? "Show Less" : "Show More"}
-                        </Button>
-                      )}
+                          </div>
+                        }
+                      />
                     </div>
-                    <AnimatedToggleContent
-                      expanded={showAllProjects}
-                      collapsedContent={
-                        <div className="space-y-2 text-xs">
-                          {cvData.keyProjects.slice(0, 4).map((project) => (
-                            <div
-                              key={project.name}
-                              className="p-2 rounded bg-kumo-control border border-kumo-line"
-                            >
-                              <p className="font-semibold text-kumo-default">
-                                {project.name}
-                              </p>
-                              <p className="text-kumo-subtle mt-1">
-                                {project.tech.join(", ")}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      }
-                      expandedContent={
-                        <div className="space-y-2 text-xs">
-                          {cvData.keyProjects.map((project) => (
-                            <div
-                              key={project.name}
-                              className="p-2 rounded bg-kumo-control border border-kumo-line "
-                            >
-                              <p className="font-semibold text-kumo-default">
-                                {project.name}
-                              </p>
-                              <p className="text-kumo-subtle mt-1">
-                                {project.tech.join(", ")}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      }
-                    />
+
+                    <div className="pt-2 border-t border-kumo-line">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                          Projects
+                        </p>
+                        {profile.keyProjects.length > 4 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowAllProjects(!showAllProjects)}
+                            className="text-xs"
+                          >
+                            {showAllProjects ? "Show Less" : "Show More"}
+                          </Button>
+                        )}
+                      </div>
+
+                      <AnimatedToggleContent
+                        expanded={showAllProjects}
+                        collapsedContent={
+                          <div className="space-y-2 text-xs">
+                            {profile.keyProjects.slice(0, 4).map((project) => (
+                              <div
+                                key={project.name}
+                                className="p-2 rounded bg-kumo-control border border-kumo-line"
+                              >
+                                <p className="font-semibold text-kumo-default">
+                                  {project.name}
+                                </p>
+                                <p className="text-kumo-subtle mt-1">
+                                  {project.tech.join(", ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        }
+                        expandedContent={
+                          <div className="space-y-2 text-xs">
+                            {profile.keyProjects.map((project) => (
+                              <div
+                                key={project.name}
+                                className="p-2 rounded bg-kumo-control border border-kumo-line"
+                              >
+                                <p className="font-semibold text-kumo-default">
+                                  {project.name}
+                                </p>
+                                <p className="text-kumo-subtle mt-1">
+                                  {project.tech.join(", ")}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </Surface>
 
-              {/* Example Prompts */}
               <div className="space-y-3 mx-auto w-full">
                 <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide text-center">
                   Ask me about my experience
@@ -676,7 +729,6 @@ function Chat() {
 
             return (
               <div key={message.id} className="space-y-2">
-                {/* Text parts */}
                 {message.parts
                   .filter((part) => part.type === "text")
                   .map((part, i) => {
@@ -716,7 +768,6 @@ function Chat() {
         </div>
       </div>
 
-      {/* Input */}
       <div className="border-t border-kumo-line bg-kumo-base">
         <form
           onSubmit={(e) => {

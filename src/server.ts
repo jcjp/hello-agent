@@ -12,7 +12,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import type { ExecutionContext } from "@cloudflare/workers-types";
-import { cvData } from "./cv-data";
+import { getPrivateCvData } from "./private-cv";
 
 /**
  * The AI SDK's downloadAssets step runs `new URL(data)` on every file
@@ -70,6 +70,7 @@ export class ChatAgent extends AIChatAgent<Env> {
   async onChatMessage(_onFinish: unknown, options?: OnChatMessageOptions) {
     const mcpTools = this.mcp.getAITools();
     const workersai = createWorkersAI({ binding: this.env.AI });
+    const cvData = await getPrivateCvData(this.env);
 
     const skillsList = Object.entries(cvData.skills)
       .map(([category, skills]) => `${category}: ${skills.join(", ")}`)
@@ -255,6 +256,23 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 
 export default {
   async fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
+    const url = new URL(request.url);
+
+    if (url.pathname === "/api/profile") {
+      try {
+        const profile = await getPrivateCvData(env);
+        return Response.json(profile);
+      } catch (error) {
+        return Response.json(
+          {
+            error:
+              error instanceof Error ? error.message : "Failed to load profile"
+          },
+          { status: 500 }
+        );
+      }
+    }
+
     return (
       (await routeAgentRequest(request, env)) ||
       new Response("Not found", { status: 404 })

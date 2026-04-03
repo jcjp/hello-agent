@@ -25,6 +25,11 @@
       }
     ]
   },
+  "kv_namespaces": [
+    {
+      "binding": "PRIVATE_CV"
+    }
+  ],
   "migrations": [
     {
       "new_sqlite_classes": ["ChatAgent"],
@@ -47,12 +52,10 @@
    * https://developers.cloudflare.com/workers/runtime-apis/bindings/
    */
   /**
-   * Environment Variables
-   * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
-   * Note: Use secrets to store sensitive data.
-   * https://developers.cloudflare.com/workers/configuration/secrets/
+   * KV Namespaces
+   * https://developers.cloudflare.com/kv/concepts/kv-bindings/
    */
-  // "vars": {  "MY_VARIABLE": "production_value" }
+  // "kv_namespaces": [{ "binding": "PRIVATE_CV", "id": "<KV_ID>" }]
   /**
    * Service Bindings (communicate between multiple Workers)
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
