@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [
     agents(),
     cloudflareTest({
-      wrangler: { configPath: "./wrangler.jsonc" },
-    }),
+      wrangler: { configPath: "./wrangler.jsonc" }
+    })
   ],
   test: {
     silent: true,

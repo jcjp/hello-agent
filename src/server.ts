@@ -12,6 +12,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import type { ExecutionContext } from "@cloudflare/workers-types";
+import { cvData } from "./cv-data";
 
 /**
  * The AI SDK's downloadAssets step runs `new URL(data)` on every file
@@ -70,11 +71,40 @@ export class ChatAgent extends AIChatAgent<Env> {
     const mcpTools = this.mcp.getAITools();
     const workersai = createWorkersAI({ binding: this.env.AI });
 
+    const skillsList = Object.entries(cvData.skills)
+      .map(([category, skills]) => `${category}: ${skills.join(", ")}`)
+      .join("\n");
+
+    const currentJob = cvData.experience[0];
+
     const result = streamText({
       model: workersai("@cf/moonshotai/kimi-k2.5", {
         sessionAffinity: this.sessionAffinity
       }),
-      system: `You are a helpful assistant that can understand images. You can check the weather, get the user's timezone, run calculations, and schedule tasks. When users share images, describe what you see and answer questions about them.
+      system: `You are a knowledgeable assistant trained on ${cvData.name}'s professional profile. Your primary role is to answer questions about their experience, skills, and projects. When relevant, relate general questions to their expertise.
+
+## About ${cvData.name}
+- **Title**: ${cvData.title}
+- **Location**: ${cvData.location}
+- **Summary**: ${cvData.summary}
+
+## Skills
+${skillsList}
+
+## Current Role
+${currentJob.title} at ${currentJob.company} (${currentJob.period})
+Highlights: ${currentJob.highlights.join(", ")}
+
+## Key Projects
+${cvData.keyProjects.map((p) => `- ${p.name} (${p.tech.join(", ")})`).join("\n")}
+
+## Guidelines
+1. **Primary Focus**: Answer questions about ${cvData.name}'s experience, skills, projects, and background.
+2. **Related Topics**: When asked about general technical topics (e.g., React, Node.js, AWS), relate them to ${cvData.name}'s specific experience and projects.
+3. **Out of Scope**: For questions unrelated to ${cvData.name}'s expertise or experience, politely decline and redirect to topics within their domain.
+4. **Tone**: Professional, knowledgeable, and personable - reflecting ${cvData.name}'s approach to technology.
+
+You can also: check the weather, get the user's timezone, run calculations, and schedule tasks. When users share images, describe what you see and answer questions about them.
 
 ${getSchedulePrompt({ date: new Date() })}
 

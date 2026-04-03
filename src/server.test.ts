@@ -1,6 +1,6 @@
 import {
   createExecutionContext,
-  waitOnExecutionContext,
+  waitOnExecutionContext
 } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { describe, it, expect } from "vitest";
@@ -26,8 +26,8 @@ describe("ChatAgent", () => {
       new Request(AGENT_URL, {
         headers: {
           Upgrade: "websocket",
-          Connection: "Upgrade",
-        },
+          Connection: "Upgrade"
+        }
       })
     );
 
@@ -40,7 +40,7 @@ describe("ChatAgent", () => {
   it("receives a response after sending a chat message", async () => {
     const response = await exports.default.fetch(
       new Request(AGENT_URL, {
-        headers: { Upgrade: "websocket", Connection: "Upgrade" },
+        headers: { Upgrade: "websocket", Connection: "Upgrade" }
       })
     );
 
@@ -62,9 +62,9 @@ describe("ChatAgent", () => {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-              messages: [{ role: "user", content: "hello" }],
-            }),
-          },
+              messages: [{ role: "user", content: "hello" }]
+            })
+          }
         })
       );
     });
@@ -75,9 +75,7 @@ describe("ChatAgent", () => {
   });
 
   it("returns 404 for unknown routes", async () => {
-    const request = new Request(
-      `${AGENT_URL}/unknown-endpoint`
-    );
+    const request = new Request(`${AGENT_URL}/unknown-endpoint`);
     const ctx = createExecutionContext();
     const response = await worker.fetch(request, env, ctx);
     await waitOnExecutionContext(ctx);

@@ -4,10 +4,10 @@ import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { getToolName, isToolUIPart, type UIMessage } from "ai";
 import type { MCPServersState } from "agents";
 import type { ChatAgent } from "./server";
+import { cvData, examplePrompts } from "./cv-data";
 import {
   Badge,
   Button,
-  Empty,
   InputArea,
   Surface,
   Switch,
@@ -226,6 +226,11 @@ function Chat() {
   const [showDebug, setShowDebug] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [showAllSkills, setShowAllSkills] = useState(false);
+  const [showAllExperience, setShowAllExperience] = useState(false);
+  const [showAllCertifications, setShowAllCertifications] = useState(false);
+  const [showAllAchievements, setShowAllAchievements] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -449,7 +454,7 @@ function Chat() {
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-lg font-semibold text-kumo-default">
-              <span className="mr-2">⛅</span>Agent Starter
+              <span className="align-super">🪪</span>
             </h1>
             <Badge variant="secondary">
               <ChatCircleDotsIcon size={12} weight="bold" className="mr-1" />
@@ -467,181 +472,7 @@ function Chat() {
                 {connected ? "Connected" : "Disconnected"}
               </Text>
             </div>
-            <div className="flex items-center gap-1.5">
-              <BugIcon size={14} className="text-kumo-inactive" />
-              <Switch
-                checked={showDebug}
-                onCheckedChange={setShowDebug}
-                size="sm"
-                aria-label="Toggle debug mode"
-              />
-            </div>
             <ThemeToggle />
-            <div className="relative" ref={mcpPanelRef}>
-              <Button
-                variant="secondary"
-                icon={<PlugsConnectedIcon size={16} />}
-                onClick={() => setShowMcpPanel(!showMcpPanel)}
-              >
-                MCP
-                {mcpToolCount > 0 && (
-                  <Badge variant="primary" className="ml-1.5">
-                    <WrenchIcon size={10} className="mr-0.5" />
-                    {mcpToolCount}
-                  </Badge>
-                )}
-              </Button>
-
-              {/* MCP Dropdown Panel */}
-              {showMcpPanel && (
-                <div className="absolute right-0 top-full mt-2 w-96 z-50">
-                  <Surface className="rounded-xl ring ring-kumo-line shadow-lg p-4 space-y-4">
-                    {/* Panel Header */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <PlugsConnectedIcon
-                          size={16}
-                          className="text-kumo-accent"
-                        />
-                        <Text size="sm" bold>
-                          MCP Servers
-                        </Text>
-                        {serverEntries.length > 0 && (
-                          <Badge variant="secondary">
-                            {serverEntries.length}
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        shape="square"
-                        aria-label="Close MCP panel"
-                        icon={<XIcon size={14} />}
-                        onClick={() => setShowMcpPanel(false)}
-                      />
-                    </div>
-
-                    {/* Add Server Form */}
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleAddServer();
-                      }}
-                      className="space-y-2"
-                    >
-                      <input
-                        type="text"
-                        value={mcpName}
-                        onChange={(e) => setMcpName(e.target.value)}
-                        placeholder="Server name"
-                        className="w-full px-3 py-1.5 text-sm rounded-lg border border-kumo-line bg-kumo-base text-kumo-default placeholder:text-kumo-inactive focus:outline-none focus:ring-1 focus:ring-kumo-accent"
-                      />
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={mcpUrl}
-                          onChange={(e) => setMcpUrl(e.target.value)}
-                          placeholder="https://mcp.example.com"
-                          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-kumo-line bg-kumo-base text-kumo-default placeholder:text-kumo-inactive focus:outline-none focus:ring-1 focus:ring-kumo-accent font-mono"
-                        />
-                        <Button
-                          type="submit"
-                          variant="primary"
-                          size="sm"
-                          icon={<PlusIcon size={14} />}
-                          disabled={
-                            isAddingServer || !mcpName.trim() || !mcpUrl.trim()
-                          }
-                        >
-                          {isAddingServer ? "..." : "Add"}
-                        </Button>
-                      </div>
-                    </form>
-
-                    {/* Server List */}
-                    {serverEntries.length > 0 && (
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {serverEntries.map(([id, server]) => (
-                          <div
-                            key={id}
-                            className="flex items-start justify-between p-2.5 rounded-lg border border-kumo-line"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium text-kumo-default truncate">
-                                  {server.name}
-                                </span>
-                                <Badge
-                                  variant={
-                                    server.state === "ready"
-                                      ? "primary"
-                                      : server.state === "failed"
-                                        ? "destructive"
-                                        : "secondary"
-                                  }
-                                >
-                                  {server.state}
-                                </Badge>
-                              </div>
-                              <span className="text-xs font-mono text-kumo-subtle truncate block mt-0.5">
-                                {server.server_url}
-                              </span>
-                              {server.state === "failed" && server.error && (
-                                <span className="text-xs text-red-500 block mt-0.5">
-                                  {server.error}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 ml-2">
-                              {server.state === "authenticating" &&
-                                server.auth_url && (
-                                  <Button
-                                    variant="primary"
-                                    size="sm"
-                                    icon={<SignInIcon size={12} />}
-                                    onClick={() =>
-                                      window.open(
-                                        server.auth_url as string,
-                                        "oauth",
-                                        "width=600,height=800"
-                                      )
-                                    }
-                                  >
-                                    Auth
-                                  </Button>
-                                )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                shape="square"
-                                aria-label="Remove server"
-                                icon={<TrashIcon size={12} />}
-                                onClick={() => handleRemoveServer(id)}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Tool Summary */}
-                    {mcpToolCount > 0 && (
-                      <div className="pt-2 border-t border-kumo-line">
-                        <div className="flex items-center gap-2">
-                          <WrenchIcon size={14} className="text-kumo-subtle" />
-                          <span className="text-xs text-kumo-subtle">
-                            {mcpToolCount} tool
-                            {mcpToolCount !== 1 ? "s" : ""} available from MCP
-                            servers
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </Surface>
-                </div>
-              )}
-            </div>
             <Button
               variant="secondary"
               icon={<TrashIcon size={16} />}
@@ -655,24 +486,363 @@ function Chat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-5 py-6 space-y-5">
+        <div className="max-w-2xl mx-auto px-5 py-6 space-y-5">
           {messages.length === 0 && (
-            <Empty
-              icon={<ChatCircleDotsIcon size={32} />}
-              title="Start a conversation"
-              contents={
-                <div className="flex flex-wrap justify-center gap-2">
-                  {[
-                    "What's the weather in Paris?",
-                    "What timezone am I in?",
-                    "Calculate 5000 * 3",
-                    "Remind me in 5 minutes to take a break"
-                  ].map((prompt) => (
+            <div className="space-y-6">
+              {/* User Profile Card */}
+              <Surface className="p-6 rounded-xl bg-gradient-to-br from-kumo-base to-kumo-control border border-kumo-line mx-auto w-full">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-kumo-default">
+                      {cvData.name}
+                    </h2>
+                    <p className="text-sm text-kumo-accent font-semibold">
+                      {cvData.title}
+                    </p>
+                    <p className="text-xs text-kumo-inactive mt-1">
+                      {cvData.location}
+                    </p>
+
+                    {/* Contact Links */}
+                    <div className="flex gap-3 text-xs text-kumo-inactive mt-2">
+                      <a
+                        href={`mailto:${cvData.email}`}
+                        className="hover:text-kumo-accent transition"
+                      >
+                        Email
+                      </a>
+                      <a
+                        href={cvData.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-kumo-accent transition"
+                      >
+                        GitHub
+                      </a>
+                      <a
+                        href={cvData.gitlab}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-kumo-accent transition"
+                      >
+                        GitLab
+                      </a>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-kumo-default leading-relaxed">
+                    {cvData.summary}
+                  </p>
+
+                  {/* Key Skills */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                        Technical Skills
+                      </p>
+                      {Object.values(cvData.skills).flat().length > 20 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAllSkills(!showAllSkills)}
+                          className="text-xs"
+                        >
+                          {showAllSkills ? "Show Less" : "Show More"}
+                        </Button>
+                      )}
+                    </div>
+
+                    <div
+                      className="overflow-hidden transition-all duration-500 ease-in-out"
+                      style={{
+                        maxHeight: showAllSkills ? "2000px" : "300px"
+                      }}
+                    >
+                      {!showAllSkills ? (
+                        <div className="flex flex-wrap gap-1.5 opacity-100 transition-opacity duration-500">
+                          {Object.values(cvData.skills)
+                            .flat()
+                            .slice(0, 20)
+                            .map((skill) => (
+                              <Badge
+                                key={skill}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {skill}
+                              </Badge>
+                            ))}
+                          {Object.values(cvData.skills).flat().length > 20 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{Object.values(cvData.skills).flat().length - 20}{" "}
+                              more
+                            </Badge>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-3 text-xs opacity-100 transition-opacity duration-500">
+                          {Object.entries(cvData.skills).map(
+                            ([category, skills]) => (
+                              <div key={category}>
+                                <p className="font-semibold text-kumo-default capitalize mb-1.5">
+                                  {category.replace(/([A-Z])/g, " $1").trim()}
+                                </p>
+                                <div className="flex flex-wrap gap-1">
+                                  {skills.map((skill) => (
+                                    <Badge
+                                      key={skill}
+                                      variant="primary"
+                                      className="text-xs"
+                                    >
+                                      {skill}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Languages */}
+                  <div className="pt-2 border-t border-kumo-line">
+                    <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide mb-2">
+                      Languages
+                    </p>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {cvData.languages.map((language) => (
+                        <Badge
+                          key={language}
+                          variant="secondary"
+                          className="text-xs"
+                        >
+                          {language}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Work Experience */}
+                  <div className="pt-2 border-t border-kumo-line">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                        Experience
+                      </p>
+                      {cvData.experience.length > 3 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setShowAllExperience(!showAllExperience)
+                          }
+                          className="text-xs"
+                        >
+                          {showAllExperience ? "Show Less" : "Show More"}
+                        </Button>
+                      )}
+                    </div>
+                    <div
+                      className="space-y-2 overflow-hidden transition-all duration-500 ease-in-out"
+                      style={{
+                        maxHeight: showAllExperience ? "2000px" : "500px"
+                      }}
+                    >
+                      {cvData.experience.map((exp, i) => (
+                        <div
+                          key={i}
+                          className="text-xs opacity-100 transition-opacity duration-500"
+                        >
+                          <p className="font-semibold text-kumo-default">
+                            {exp.title}
+                          </p>
+                          <p className="text-kumo-accent">{exp.company}</p>
+                          <p className="text-kumo-subtle text-xs">
+                            {exp.period}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Education */}
+                  <div className="pt-2 border-t border-kumo-line">
+                    <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide mb-2">
+                      Education
+                    </p>
+                    <div className="text-xs mb-1.5">
+                      <p className="font-semibold text-kumo-default">
+                        {cvData.education[0].degree}
+                        {cvData.education[0].field &&
+                          ` in ${cvData.education[0].field}`}
+                      </p>
+                      <p className="text-kumo-inactive">
+                        {cvData.education[0].school}
+                      </p>
+                      <p className="text-kumo-subtle">
+                        {cvData.education[0].year}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Certifications - Highlighted */}
+                  <div className="pt-2 border-t border-kumo-line">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                        Key Certifications
+                      </p>
+                      {cvData.certifications.length > 2 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setShowAllCertifications(!showAllCertifications)
+                          }
+                          className="text-xs"
+                        >
+                          {showAllCertifications ? "Show Less" : "Show More"}
+                        </Button>
+                      )}
+                    </div>
+                    <div
+                      className="space-y-2 overflow-hidden transition-all duration-500 ease-in-out"
+                      style={{
+                        maxHeight: showAllCertifications ? "3000px" : "400px"
+                      }}
+                    >
+                      {cvData.certifications.map((cert) => (
+                        <div
+                          key={cert.name}
+                          className="p-2 rounded bg-kumo-control border border-kumo-accent opacity-100 transition-opacity duration-500"
+                        >
+                          <p className="text-xs font-semibold text-kumo-default">
+                            {cert.name}
+                          </p>
+                          <p className="text-xs text-kumo-accent">
+                            {cert.issuer}
+                          </p>
+                          {cert.description && (
+                            <p className="text-xs text-kumo-subtle mt-1">
+                              {cert.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-kumo-default mt-3">
+                      <span className="font-semibold">
+                        {cvData.certifications.length}
+                      </span>{" "}
+                      Total Professional Certifications
+                    </p>
+                    <p className="text-xs text-kumo-default mt-1">
+                      <span className="font-semibold">
+                        {cvData.trainings.length}
+                      </span>{" "}
+                      Online Trainings Completed
+                    </p>
+                  </div>
+
+                  {/* Achievements */}
+                  <div className="pt-2 border-t border-kumo-line">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                        Achievements
+                      </p>
+                      {cvData.achievements.length > 2 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setShowAllAchievements(!showAllAchievements)
+                          }
+                          className="text-xs"
+                        >
+                          {showAllAchievements ? "Show Less" : "Show More"}
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-kumo-default">
+                      <span className="font-semibold">
+                        {cvData.achievements.length}
+                      </span>{" "}
+                      Awards & Honors
+                    </p>
+                    <div
+                      className="mt-2 overflow-hidden transition-all duration-500 ease-in-out"
+                      style={{
+                        maxHeight: showAllAchievements ? "2000px" : "150px"
+                      }}
+                    >
+                      {cvData.achievements.map((achievement, i) => (
+                        <p
+                          key={i}
+                          className="text-xs text-kumo-default mb-1 opacity-100 transition-opacity duration-500"
+                        >
+                          <span className="font-semibold">
+                            {achievement.title}
+                          </span>{" "}
+                          ({achievement.year})
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Key Projects */}
+                  <div className="pt-2 border-t border-kumo-line">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
+                        Key Projects
+                      </p>
+                      {cvData.keyProjects.length > 4 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAllProjects(!showAllProjects)}
+                          className="text-xs"
+                        >
+                          {showAllProjects ? "Show Less" : "Show More"}
+                        </Button>
+                      )}
+                    </div>
+                    <div
+                      className="space-y-2 text-xs overflow-hidden transition-all duration-500 ease-in-out"
+                      style={{
+                        maxHeight: showAllProjects ? "3000px" : "600px"
+                      }}
+                    >
+                      {cvData.keyProjects.map((project) => (
+                        <div
+                          key={project.name}
+                          className="p-2 rounded bg-kumo-control border border-kumo-line opacity-100 transition-opacity duration-500"
+                        >
+                          <p className="font-semibold text-kumo-default">
+                            {project.name}
+                          </p>
+                          <p className="text-kumo-subtle mt-1">
+                            {project.tech.join(", ")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Surface>
+
+              {/* Example Prompts */}
+              <div className="space-y-3 mx-auto w-full">
+                <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide text-center">
+                  Ask me about my experience
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {examplePrompts.map((prompt) => (
                     <Button
                       key={prompt}
                       variant="outline"
                       size="sm"
                       disabled={isStreaming}
+                      className="text-left justify-start"
                       onClick={() => {
                         sendMessage({
                           role: "user",
@@ -684,8 +854,8 @@ function Chat() {
                     </Button>
                   ))}
                 </div>
-              }
-            />
+              </div>
+            </div>
           )}
 
           {messages.map((message: UIMessage, index: number) => {
