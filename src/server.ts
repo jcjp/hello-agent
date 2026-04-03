@@ -11,6 +11,7 @@ import {
   type ModelMessage
 } from "ai";
 import { z } from "zod";
+import type { ExecutionContext } from "@cloudflare/workers-types";
 
 /**
  * The AI SDK's downloadAssets step runs `new URL(data)` on every file
@@ -223,7 +224,7 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 }
 
 export default {
-  async fetch(request: Request, env: Env) {
+  async fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
     return (
       (await routeAgentRequest(request, env)) ||
       new Response("Not found", { status: 404 })
