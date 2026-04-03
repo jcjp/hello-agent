@@ -11,3 +11,36 @@ body,
   height: 100%;
   margin: 0;
 }
+
+.collapse-content {
+  will-change: height;
+}
+
+.collapse-content.is-ready {
+  transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.collapse-inner {
+  display: flow-root;
+  transition: opacity 220ms ease;
+}
+
+.collapse-inner.is-collapsed {
+  opacity: 0.9;
+}
+
+.collapse-inner.is-expanded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapse-content.is-ready,
+  .collapse-inner {
+    transition: none;
+  }
+
+  .collapse-inner.is-collapsed,
+  .collapse-inner.is-expanded {
+    opacity: 1;
+  }
+}

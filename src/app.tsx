@@ -1,16 +1,18 @@
-import { Suspense, useCallback, useState, useEffect, useRef } from "react";
+import {
+  Suspense,
+  useCallback,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type ReactNode
+} from "react";
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
 import { type UIMessage } from "ai";
 import type { ChatAgent } from "./server";
 import { cvData, examplePrompts } from "./cv-data";
-import {
-  Badge,
-  Button,
-  InputArea,
-  Surface,
-  Text
-} from "@cloudflare/kumo";
+import { Badge, Button, InputArea, Surface, Text } from "@cloudflare/kumo";
 import { Toasty, useKumoToastManager } from "@cloudflare/kumo/components/toast";
 import { Streamdown } from "streamdown";
 import { code } from "@streamdown/code";
@@ -21,7 +23,7 @@ import {
   ChatCircleDotsIcon,
   CircleIcon,
   MoonIcon,
-  SunIcon,
+  SunIcon
 } from "@phosphor-icons/react";
 
 // ── Small components ──────────────────────────────────────────────────
@@ -51,6 +53,59 @@ function ThemeToggle() {
   );
 }
 
+function AnimatedToggleContent({
+  expanded,
+  collapsedContent,
+  expandedContent
+}: {
+  expanded: boolean;
+  collapsedContent: ReactNode;
+  expandedContent: ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<string>("auto");
+  const [ready, setReady] = useState(false);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    const nextHeight = `${content.getBoundingClientRect().height}px`;
+
+    if (!ready) {
+      setHeight(nextHeight);
+      setReady(true);
+      return;
+    }
+
+    const currentHeight = `${container.getBoundingClientRect().height}px`;
+    setHeight(currentHeight);
+
+    const frame = requestAnimationFrame(() => {
+      setHeight(nextHeight);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [expanded, collapsedContent, expandedContent, ready]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={`collapse-content overflow-hidden ${ready ? "is-ready" : ""}`}
+      style={{ height }}
+    >
+      <div
+        ref={contentRef}
+        className={`collapse-inner ${expanded ? "is-expanded" : "is-collapsed"}`}
+      >
+        {expanded ? expandedContent : collapsedContent}
+      </div>
+    </div>
+  );
+}
+
 // ── Main chat ─────────────────────────────────────────────────────────
 
 function Chat() {
@@ -64,7 +119,7 @@ function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const toasts = useKumoToastManager();
-  
+
   const agent = useAgent<ChatAgent>({
     agent: "ChatAgent",
     onOpen: useCallback(() => setConnected(true), []),
@@ -92,13 +147,7 @@ function Chat() {
     )
   });
 
-  const {
-    messages,
-    sendMessage,
-    clearHistory,
-    stop,
-    status
-  } = useAgentChat({
+  const { messages, sendMessage, clearHistory, stop, status } = useAgentChat({
     agent,
     onToolCall: async (event) => {
       if (
@@ -131,7 +180,7 @@ function Chat() {
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if ((!text) || isStreaming) return;
+    if (!text || isStreaming) return;
     setInput("");
 
     const parts: Array<
@@ -249,14 +298,9 @@ function Chat() {
                       )}
                     </div>
 
-                    <div
-                      className="collapse-content overflow-hidden"
-                      style={{
-                        maxHeight: showAllSkills ? "2000px" : "300px",
-                        opacity: showAllSkills ? 1 : 1
-                      }}
-                    >
-                      {!showAllSkills ? (
+                    <AnimatedToggleContent
+                      expanded={showAllSkills}
+                      collapsedContent={
                         <div className="flex flex-wrap gap-1.5">
                           {Object.values(cvData.skills)
                             .flat()
@@ -277,7 +321,8 @@ function Chat() {
                             </Badge>
                           )}
                         </div>
-                      ) : (
+                      }
+                      expandedContent={
                         <div className="space-y-3 text-xs">
                           {Object.entries(cvData.skills).map(
                             ([category, skills]) => (
@@ -300,8 +345,8 @@ function Chat() {
                             )
                           )}
                         </div>
-                      )}
-                    </div>
+                      }
+                    />
                   </div>
 
                   {/* Languages */}
@@ -341,23 +386,11 @@ function Chat() {
                         </Button>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      {showAllExperience
-                        ? cvData.experience.map((exp) => (
-                            <div
-                              key={exp.company + exp.period}
-                              className="text-xs "
-                            >
-                              <p className="font-semibold text-kumo-default">
-                                {exp.title}
-                              </p>
-                              <p className="text-kumo-accent">{exp.company}</p>
-                              <p className="text-kumo-subtle text-xs">
-                                {exp.period}
-                              </p>
-                            </div>
-                          ))
-                        : cvData.experience.slice(0, 3).map((exp) => (
+                    <AnimatedToggleContent
+                      expanded={showAllExperience}
+                      collapsedContent={
+                        <div className="space-y-2">
+                          {cvData.experience.slice(0, 3).map((exp) => (
                             <div
                               key={exp.company + exp.period}
                               className="text-xs"
@@ -371,7 +404,27 @@ function Chat() {
                               </p>
                             </div>
                           ))}
-                    </div>
+                        </div>
+                      }
+                      expandedContent={
+                        <div className="space-y-2">
+                          {cvData.experience.map((exp) => (
+                            <div
+                              key={exp.company + exp.period}
+                              className="text-xs "
+                            >
+                              <p className="font-semibold text-kumo-default">
+                                {exp.title}
+                              </p>
+                              <p className="text-kumo-accent">{exp.company}</p>
+                              <p className="text-kumo-subtle text-xs">
+                                {exp.period}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      }
+                    />
                   </div>
 
                   {/* Education */}
@@ -413,27 +466,11 @@ function Chat() {
                         </Button>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      {showAllCertifications
-                        ? cvData.certifications.map((cert) => (
-                            <div
-                              key={cert.name}
-                              className="p-2 rounded bg-kumo-control border border-kumo-accent "
-                            >
-                              <p className="text-xs font-semibold text-kumo-default">
-                                {cert.name}
-                              </p>
-                              <p className="text-xs text-kumo-accent">
-                                {cert.issuer}
-                              </p>
-                              {cert.description && (
-                                <p className="text-xs text-kumo-subtle mt-1">
-                                  {cert.description}
-                                </p>
-                              )}
-                            </div>
-                          ))
-                        : cvData.certifications.slice(0, 2).map((cert) => (
+                    <AnimatedToggleContent
+                      expanded={showAllCertifications}
+                      collapsedContent={
+                        <div className="space-y-2">
+                          {cvData.certifications.slice(0, 2).map((cert) => (
                             <div
                               key={cert.name}
                               className="p-2 rounded bg-kumo-control border border-kumo-accent"
@@ -451,7 +488,31 @@ function Chat() {
                               )}
                             </div>
                           ))}
-                    </div>
+                        </div>
+                      }
+                      expandedContent={
+                        <div className="space-y-2">
+                          {cvData.certifications.map((cert) => (
+                            <div
+                              key={cert.name}
+                              className="p-2 rounded bg-kumo-control border border-kumo-accent "
+                            >
+                              <p className="text-xs font-semibold text-kumo-default">
+                                {cert.name}
+                              </p>
+                              <p className="text-xs text-kumo-accent">
+                                {cert.issuer}
+                              </p>
+                              {cert.description && (
+                                <p className="text-xs text-kumo-subtle mt-1">
+                                  {cert.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      }
+                    />
                     <p className="text-xs text-kumo-default mt-3">
                       <span className="font-semibold">
                         {cvData.certifications.length}
@@ -491,31 +552,35 @@ function Chat() {
                       </span>{" "}
                       Awards & Honors
                     </p>
-                    <div className="mt-2 space-y-1">
-                      {showAllAchievements
-                        ? cvData.achievements.map((achievement, i) => (
-                            <p
-                              key={i}
-                              className="text-xs text-kumo-default "
-                            >
-                              <span className="font-semibold">
-                                {achievement.title}
-                              </span>{" "}
-                              ({achievement.year})
-                            </p>
-                          ))
-                        : cvData.achievements.slice(0, 2).map((achievement, i) => (
-                            <p
-                              key={i}
-                              className="text-xs text-kumo-default"
-                            >
+                    <AnimatedToggleContent
+                      expanded={showAllAchievements}
+                      collapsedContent={
+                        <div className="mt-2 space-y-1">
+                          {cvData.achievements
+                            .slice(0, 2)
+                            .map((achievement, i) => (
+                              <p key={i} className="text-xs text-kumo-default">
+                                <span className="font-semibold">
+                                  {achievement.title}
+                                </span>{" "}
+                                ({achievement.year})
+                              </p>
+                            ))}
+                        </div>
+                      }
+                      expandedContent={
+                        <div className="mt-2 space-y-1">
+                          {cvData.achievements.map((achievement, i) => (
+                            <p key={i} className="text-xs text-kumo-default ">
                               <span className="font-semibold">
                                 {achievement.title}
                               </span>{" "}
                               ({achievement.year})
                             </p>
                           ))}
-                    </div>
+                        </div>
+                      }
+                    />
                   </div>
 
                   {/* Key Projects */}
@@ -535,22 +600,11 @@ function Chat() {
                         </Button>
                       )}
                     </div>
-                    <div className="space-y-2 text-xs">
-                      {showAllProjects
-                        ? cvData.keyProjects.map((project) => (
-                            <div
-                              key={project.name}
-                              className="p-2 rounded bg-kumo-control border border-kumo-line "
-                            >
-                              <p className="font-semibold text-kumo-default">
-                                {project.name}
-                              </p>
-                              <p className="text-kumo-subtle mt-1">
-                                {project.tech.join(", ")}
-                              </p>
-                            </div>
-                          ))
-                        : cvData.keyProjects.slice(0, 4).map((project) => (
+                    <AnimatedToggleContent
+                      expanded={showAllProjects}
+                      collapsedContent={
+                        <div className="space-y-2 text-xs">
+                          {cvData.keyProjects.slice(0, 4).map((project) => (
                             <div
                               key={project.name}
                               className="p-2 rounded bg-kumo-control border border-kumo-line"
@@ -563,7 +617,26 @@ function Chat() {
                               </p>
                             </div>
                           ))}
-                    </div>
+                        </div>
+                      }
+                      expandedContent={
+                        <div className="space-y-2 text-xs">
+                          {cvData.keyProjects.map((project) => (
+                            <div
+                              key={project.name}
+                              className="p-2 rounded bg-kumo-control border border-kumo-line "
+                            >
+                              <p className="font-semibold text-kumo-default">
+                                {project.name}
+                              </p>
+                              <p className="text-kumo-subtle mt-1">
+                                {project.tech.join(", ")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      }
+                    />
                   </div>
                 </div>
               </Surface>
