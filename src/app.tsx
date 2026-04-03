@@ -1,8 +1,7 @@
 import { Suspense, useCallback, useState, useEffect, useRef } from "react";
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
-import { getToolName, isToolUIPart, type UIMessage } from "ai";
-import type { MCPServersState } from "agents";
+import { type UIMessage } from "ai";
 import type { ChatAgent } from "./server";
 import { cvData, examplePrompts } from "./cv-data";
 import {
@@ -10,7 +9,6 @@ import {
   Button,
   InputArea,
   Surface,
-  Switch,
   Text
 } from "@cloudflare/kumo";
 import { Toasty, useKumoToastManager } from "@cloudflare/kumo/components/toast";
@@ -20,51 +18,11 @@ import {
   PaperPlaneRightIcon,
   StopIcon,
   TrashIcon,
-  GearIcon,
   ChatCircleDotsIcon,
   CircleIcon,
   MoonIcon,
   SunIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  BrainIcon,
-  CaretDownIcon,
-  BugIcon,
-  PlugsConnectedIcon,
-  PlusIcon,
-  SignInIcon,
-  XIcon,
-  WrenchIcon,
-  PaperclipIcon,
-  ImageIcon
 } from "@phosphor-icons/react";
-
-// ── Attachment helpers ────────────────────────────────────────────────
-
-interface Attachment {
-  id: string;
-  file: File;
-  preview: string;
-  mediaType: string;
-}
-
-function createAttachment(file: File): Attachment {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    file,
-    preview: URL.createObjectURL(file),
-    mediaType: file.type || "application/octet-stream"
-  };
-}
-
-function fileToDataUri(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 // ── Small components ──────────────────────────────────────────────────
 
@@ -93,139 +51,11 @@ function ThemeToggle() {
   );
 }
 
-// ── Tool rendering ────────────────────────────────────────────────────
-
-function ToolPartView({
-  part,
-  addToolApprovalResponse
-}: {
-  part: UIMessage["parts"][number];
-  addToolApprovalResponse: (response: {
-    id: string;
-    approved: boolean;
-  }) => void;
-}) {
-  if (!isToolUIPart(part)) return null;
-  const toolName = getToolName(part);
-
-  // Completed
-  if (part.state === "output-available") {
-    return (
-      <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-2.5 rounded-xl ring ring-kumo-line">
-          <div className="flex items-center gap-2 mb-1">
-            <GearIcon size={14} className="text-kumo-inactive" />
-            <Text size="xs" variant="secondary" bold>
-              {toolName}
-            </Text>
-            <Badge variant="secondary">Done</Badge>
-          </div>
-          <div className="font-mono">
-            <Text size="xs" variant="secondary">
-              {JSON.stringify(part.output, null, 2)}
-            </Text>
-          </div>
-        </Surface>
-      </div>
-    );
-  }
-
-  // Needs approval
-  if ("approval" in part && part.state === "approval-requested") {
-    const approvalId = (part.approval as { id?: string })?.id;
-    return (
-      <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-3 rounded-xl ring-2 ring-kumo-warning">
-          <div className="flex items-center gap-2 mb-2">
-            <GearIcon size={14} className="text-kumo-warning" />
-            <Text size="sm" bold>
-              Approval needed: {toolName}
-            </Text>
-          </div>
-          <div className="font-mono mb-3">
-            <Text size="xs" variant="secondary">
-              {JSON.stringify(part.input, null, 2)}
-            </Text>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              icon={<CheckCircleIcon size={14} />}
-              onClick={() => {
-                if (approvalId) {
-                  addToolApprovalResponse({ id: approvalId, approved: true });
-                }
-              }}
-            >
-              Approve
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              icon={<XCircleIcon size={14} />}
-              onClick={() => {
-                if (approvalId) {
-                  addToolApprovalResponse({ id: approvalId, approved: false });
-                }
-              }}
-            >
-              Reject
-            </Button>
-          </div>
-        </Surface>
-      </div>
-    );
-  }
-
-  // Rejected / denied
-  if (
-    part.state === "output-denied" ||
-    ("approval" in part &&
-      (part.approval as { approved?: boolean })?.approved === false)
-  ) {
-    return (
-      <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-2.5 rounded-xl ring ring-kumo-line">
-          <div className="flex items-center gap-2">
-            <XCircleIcon size={14} className="text-kumo-danger" />
-            <Text size="xs" variant="secondary" bold>
-              {toolName}
-            </Text>
-            <Badge variant="secondary">Rejected</Badge>
-          </div>
-        </Surface>
-      </div>
-    );
-  }
-
-  // Executing
-  if (part.state === "input-available" || part.state === "input-streaming") {
-    return (
-      <div className="flex justify-start">
-        <Surface className="max-w-[85%] px-4 py-2.5 rounded-xl ring ring-kumo-line">
-          <div className="flex items-center gap-2">
-            <GearIcon size={14} className="text-kumo-inactive animate-spin" />
-            <Text size="xs" variant="secondary">
-              Running {toolName}...
-            </Text>
-          </div>
-        </Surface>
-      </div>
-    );
-  }
-
-  return null;
-}
-
 // ── Main chat ─────────────────────────────────────────────────────────
 
 function Chat() {
   const [connected, setConnected] = useState(false);
   const [input, setInput] = useState("");
-  const [showDebug, setShowDebug] = useState(false);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
   const [showAllSkills, setShowAllSkills] = useState(false);
   const [showAllExperience, setShowAllExperience] = useState(false);
   const [showAllCertifications, setShowAllCertifications] = useState(false);
@@ -233,20 +63,8 @@ function Chat() {
   const [showAllProjects, setShowAllProjects] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const toasts = useKumoToastManager();
-  const [mcpState, setMcpState] = useState<MCPServersState>({
-    prompts: [],
-    resources: [],
-    servers: {},
-    tools: []
-  });
-  const [showMcpPanel, setShowMcpPanel] = useState(false);
-  const [mcpName, setMcpName] = useState("");
-  const [mcpUrl, setMcpUrl] = useState("");
-  const [isAddingServer, setIsAddingServer] = useState(false);
-  const mcpPanelRef = useRef<HTMLDivElement>(null);
-
+  
   const agent = useAgent<ChatAgent>({
     agent: "ChatAgent",
     onOpen: useCallback(() => setConnected(true), []),
@@ -255,9 +73,6 @@ function Chat() {
       (error: Event) => console.error("WebSocket error:", error),
       []
     ),
-    onMcpUpdate: useCallback((state: MCPServersState) => {
-      setMcpState(state);
-    }, []),
     onMessage: useCallback(
       (message: MessageEvent) => {
         try {
@@ -277,51 +92,10 @@ function Chat() {
     )
   });
 
-  // Close MCP panel when clicking outside
-  useEffect(() => {
-    if (!showMcpPanel) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (
-        mcpPanelRef.current &&
-        !mcpPanelRef.current.contains(e.target as Node)
-      ) {
-        setShowMcpPanel(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMcpPanel]);
-
-  const handleAddServer = async () => {
-    if (!mcpName.trim() || !mcpUrl.trim()) return;
-    setIsAddingServer(true);
-    try {
-      await agent.stub.addServer(mcpName.trim(), mcpUrl.trim());
-      setMcpName("");
-      setMcpUrl("");
-    } catch (e) {
-      console.error("Failed to add MCP server:", e);
-    } finally {
-      setIsAddingServer(false);
-    }
-  };
-
-  const handleRemoveServer = async (serverId: string) => {
-    try {
-      await agent.stub.removeServer(serverId);
-    } catch (e) {
-      console.error("Failed to remove MCP server:", e);
-    }
-  };
-
-  const serverEntries = Object.entries(mcpState.servers);
-  const mcpToolCount = mcpState.tools.length;
-
   const {
     messages,
     sendMessage,
     clearHistory,
-    addToolApprovalResponse,
     stop,
     status
   } = useAgentChat({
@@ -355,64 +129,9 @@ function Chat() {
     }
   }, [isStreaming]);
 
-  const addFiles = useCallback((files: FileList | File[]) => {
-    const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (images.length === 0) return;
-    setAttachments((prev) => [...prev, ...images.map(createAttachment)]);
-  }, []);
-
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((prev) => {
-      const att = prev.find((a) => a.id === id);
-      if (att) URL.revokeObjectURL(att.preview);
-      return prev.filter((a) => a.id !== id);
-    });
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes("Files")) setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.currentTarget === e.target) setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
-    },
-    [addFiles]
-  );
-
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      const files: File[] = [];
-      for (const item of items) {
-        if (item.kind === "file") {
-          const file = item.getAsFile();
-          if (file) files.push(file);
-        }
-      }
-      if (files.length > 0) {
-        e.preventDefault();
-        addFiles(files);
-      }
-    },
-    [addFiles]
-  );
-
   const send = useCallback(async () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || isStreaming) return;
+    if ((!text) || isStreaming) return;
     setInput("");
 
     const parts: Array<
@@ -421,34 +140,12 @@ function Chat() {
     > = [];
     if (text) parts.push({ type: "text", text });
 
-    for (const att of attachments) {
-      const dataUri = await fileToDataUri(att.file);
-      parts.push({ type: "file", mediaType: att.mediaType, url: dataUri });
-    }
-
-    for (const att of attachments) URL.revokeObjectURL(att.preview);
-    setAttachments([]);
-
     sendMessage({ role: "user", parts });
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [input, attachments, isStreaming, sendMessage]);
+  }, [input, isStreaming, sendMessage]);
 
   return (
-    <div
-      className="flex flex-col h-screen bg-kumo-elevated relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      {isDragging && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-kumo-elevated/80 backdrop-blur-sm border-2 border-dashed border-kumo-brand rounded-xl m-2 pointer-events-none">
-          <div className="flex flex-col items-center gap-2 text-kumo-brand">
-            <ImageIcon size={40} />
-            <Text variant="heading3">Drop images here</Text>
-          </div>
-        </div>
-      )}
-
+    <div className="flex flex-col h-screen bg-kumo-elevated relative">
       {/* Header */}
       <header className="px-5 py-4 bg-kumo-base border-b border-kumo-line">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
@@ -553,13 +250,14 @@ function Chat() {
                     </div>
 
                     <div
-                      className="overflow-hidden transition-all duration-500 ease-in-out"
+                      className="collapse-content overflow-hidden"
                       style={{
-                        maxHeight: showAllSkills ? "2000px" : "300px"
+                        maxHeight: showAllSkills ? "2000px" : "300px",
+                        opacity: showAllSkills ? 1 : 1
                       }}
                     >
                       {!showAllSkills ? (
-                        <div className="flex flex-wrap gap-1.5 opacity-100 transition-opacity duration-500">
+                        <div className="flex flex-wrap gap-1.5">
                           {Object.values(cvData.skills)
                             .flat()
                             .slice(0, 20)
@@ -580,7 +278,7 @@ function Chat() {
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-3 text-xs opacity-100 transition-opacity duration-500">
+                        <div className="space-y-3 text-xs">
                           {Object.entries(cvData.skills).map(
                             ([category, skills]) => (
                               <div key={category}>
@@ -643,26 +341,36 @@ function Chat() {
                         </Button>
                       )}
                     </div>
-                    <div
-                      className="space-y-2 overflow-hidden transition-all duration-500 ease-in-out"
-                      style={{
-                        maxHeight: showAllExperience ? "2000px" : "500px"
-                      }}
-                    >
-                      {cvData.experience.map((exp, i) => (
-                        <div
-                          key={i}
-                          className="text-xs opacity-100 transition-opacity duration-500"
-                        >
-                          <p className="font-semibold text-kumo-default">
-                            {exp.title}
-                          </p>
-                          <p className="text-kumo-accent">{exp.company}</p>
-                          <p className="text-kumo-subtle text-xs">
-                            {exp.period}
-                          </p>
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      {showAllExperience
+                        ? cvData.experience.map((exp) => (
+                            <div
+                              key={exp.company + exp.period}
+                              className="text-xs "
+                            >
+                              <p className="font-semibold text-kumo-default">
+                                {exp.title}
+                              </p>
+                              <p className="text-kumo-accent">{exp.company}</p>
+                              <p className="text-kumo-subtle text-xs">
+                                {exp.period}
+                              </p>
+                            </div>
+                          ))
+                        : cvData.experience.slice(0, 3).map((exp) => (
+                            <div
+                              key={exp.company + exp.period}
+                              className="text-xs"
+                            >
+                              <p className="font-semibold text-kumo-default">
+                                {exp.title}
+                              </p>
+                              <p className="text-kumo-accent">{exp.company}</p>
+                              <p className="text-kumo-subtle text-xs">
+                                {exp.period}
+                              </p>
+                            </div>
+                          ))}
                     </div>
                   </div>
 
@@ -690,7 +398,7 @@ function Chat() {
                   <div className="pt-2 border-t border-kumo-line">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Key Certifications
+                        Certifications
                       </p>
                       {cvData.certifications.length > 2 && (
                         <Button
@@ -705,30 +413,44 @@ function Chat() {
                         </Button>
                       )}
                     </div>
-                    <div
-                      className="space-y-2 overflow-hidden transition-all duration-500 ease-in-out"
-                      style={{
-                        maxHeight: showAllCertifications ? "3000px" : "400px"
-                      }}
-                    >
-                      {cvData.certifications.map((cert) => (
-                        <div
-                          key={cert.name}
-                          className="p-2 rounded bg-kumo-control border border-kumo-accent opacity-100 transition-opacity duration-500"
-                        >
-                          <p className="text-xs font-semibold text-kumo-default">
-                            {cert.name}
-                          </p>
-                          <p className="text-xs text-kumo-accent">
-                            {cert.issuer}
-                          </p>
-                          {cert.description && (
-                            <p className="text-xs text-kumo-subtle mt-1">
-                              {cert.description}
-                            </p>
-                          )}
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      {showAllCertifications
+                        ? cvData.certifications.map((cert) => (
+                            <div
+                              key={cert.name}
+                              className="p-2 rounded bg-kumo-control border border-kumo-accent "
+                            >
+                              <p className="text-xs font-semibold text-kumo-default">
+                                {cert.name}
+                              </p>
+                              <p className="text-xs text-kumo-accent">
+                                {cert.issuer}
+                              </p>
+                              {cert.description && (
+                                <p className="text-xs text-kumo-subtle mt-1">
+                                  {cert.description}
+                                </p>
+                              )}
+                            </div>
+                          ))
+                        : cvData.certifications.slice(0, 2).map((cert) => (
+                            <div
+                              key={cert.name}
+                              className="p-2 rounded bg-kumo-control border border-kumo-accent"
+                            >
+                              <p className="text-xs font-semibold text-kumo-default">
+                                {cert.name}
+                              </p>
+                              <p className="text-xs text-kumo-accent">
+                                {cert.issuer}
+                              </p>
+                              {cert.description && (
+                                <p className="text-xs text-kumo-subtle mt-1">
+                                  {cert.description}
+                                </p>
+                              )}
+                            </div>
+                          ))}
                     </div>
                     <p className="text-xs text-kumo-default mt-3">
                       <span className="font-semibold">
@@ -769,23 +491,30 @@ function Chat() {
                       </span>{" "}
                       Awards & Honors
                     </p>
-                    <div
-                      className="mt-2 overflow-hidden transition-all duration-500 ease-in-out"
-                      style={{
-                        maxHeight: showAllAchievements ? "2000px" : "150px"
-                      }}
-                    >
-                      {cvData.achievements.map((achievement, i) => (
-                        <p
-                          key={i}
-                          className="text-xs text-kumo-default mb-1 opacity-100 transition-opacity duration-500"
-                        >
-                          <span className="font-semibold">
-                            {achievement.title}
-                          </span>{" "}
-                          ({achievement.year})
-                        </p>
-                      ))}
+                    <div className="mt-2 space-y-1">
+                      {showAllAchievements
+                        ? cvData.achievements.map((achievement, i) => (
+                            <p
+                              key={i}
+                              className="text-xs text-kumo-default "
+                            >
+                              <span className="font-semibold">
+                                {achievement.title}
+                              </span>{" "}
+                              ({achievement.year})
+                            </p>
+                          ))
+                        : cvData.achievements.slice(0, 2).map((achievement, i) => (
+                            <p
+                              key={i}
+                              className="text-xs text-kumo-default"
+                            >
+                              <span className="font-semibold">
+                                {achievement.title}
+                              </span>{" "}
+                              ({achievement.year})
+                            </p>
+                          ))}
                     </div>
                   </div>
 
@@ -793,7 +522,7 @@ function Chat() {
                   <div className="pt-2 border-t border-kumo-line">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs font-semibold text-kumo-subtle uppercase tracking-wide">
-                        Key Projects
+                        Projects
                       </p>
                       {cvData.keyProjects.length > 4 && (
                         <Button
@@ -806,25 +535,34 @@ function Chat() {
                         </Button>
                       )}
                     </div>
-                    <div
-                      className="space-y-2 text-xs overflow-hidden transition-all duration-500 ease-in-out"
-                      style={{
-                        maxHeight: showAllProjects ? "3000px" : "600px"
-                      }}
-                    >
-                      {cvData.keyProjects.map((project) => (
-                        <div
-                          key={project.name}
-                          className="p-2 rounded bg-kumo-control border border-kumo-line opacity-100 transition-opacity duration-500"
-                        >
-                          <p className="font-semibold text-kumo-default">
-                            {project.name}
-                          </p>
-                          <p className="text-kumo-subtle mt-1">
-                            {project.tech.join(", ")}
-                          </p>
-                        </div>
-                      ))}
+                    <div className="space-y-2 text-xs">
+                      {showAllProjects
+                        ? cvData.keyProjects.map((project) => (
+                            <div
+                              key={project.name}
+                              className="p-2 rounded bg-kumo-control border border-kumo-line "
+                            >
+                              <p className="font-semibold text-kumo-default">
+                                {project.name}
+                              </p>
+                              <p className="text-kumo-subtle mt-1">
+                                {project.tech.join(", ")}
+                              </p>
+                            </div>
+                          ))
+                        : cvData.keyProjects.slice(0, 4).map((project) => (
+                            <div
+                              key={project.name}
+                              className="p-2 rounded bg-kumo-control border border-kumo-line"
+                            >
+                              <p className="font-semibold text-kumo-default">
+                                {project.name}
+                              </p>
+                              <p className="text-kumo-subtle mt-1">
+                                {project.tech.join(", ")}
+                              </p>
+                            </div>
+                          ))}
                     </div>
                   </div>
                 </div>
@@ -865,87 +603,6 @@ function Chat() {
 
             return (
               <div key={message.id} className="space-y-2">
-                {showDebug && (
-                  <pre className="text-[11px] text-kumo-subtle bg-kumo-control rounded-lg p-3 overflow-auto max-h-64">
-                    {JSON.stringify(message, null, 2)}
-                  </pre>
-                )}
-
-                {/* Tool parts */}
-                {message.parts.filter(isToolUIPart).map((part) => (
-                  <ToolPartView
-                    key={part.toolCallId}
-                    part={part}
-                    addToolApprovalResponse={addToolApprovalResponse}
-                  />
-                ))}
-
-                {/* Reasoning parts */}
-                {message.parts
-                  .filter(
-                    (part) =>
-                      part.type === "reasoning" &&
-                      (part as { text?: string }).text?.trim()
-                  )
-                  .map((part, i) => {
-                    const reasoning = part as {
-                      type: "reasoning";
-                      text: string;
-                      state?: "streaming" | "done";
-                    };
-                    const isDone = reasoning.state === "done" || !isStreaming;
-                    return (
-                      <div key={i} className="flex justify-start">
-                        <details className="max-w-[85%] w-full" open={!isDone}>
-                          <summary className="flex items-center gap-2 cursor-pointer px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-sm select-none">
-                            <BrainIcon size={14} className="text-purple-400" />
-                            <span className="font-medium text-kumo-default">
-                              Reasoning
-                            </span>
-                            {isDone ? (
-                              <span className="text-xs text-kumo-success">
-                                Complete
-                              </span>
-                            ) : (
-                              <span className="text-xs text-kumo-brand">
-                                Thinking...
-                              </span>
-                            )}
-                            <CaretDownIcon
-                              size={14}
-                              className="ml-auto text-kumo-inactive"
-                            />
-                          </summary>
-                          <pre className="mt-2 px-3 py-2 rounded-lg bg-kumo-control text-xs text-kumo-default whitespace-pre-wrap overflow-auto max-h-64">
-                            {reasoning.text}
-                          </pre>
-                        </details>
-                      </div>
-                    );
-                  })}
-
-                {/* Image parts */}
-                {message.parts
-                  .filter(
-                    (part): part is Extract<typeof part, { type: "file" }> =>
-                      part.type === "file" &&
-                      (part as { mediaType?: string }).mediaType?.startsWith(
-                        "image/"
-                      ) === true
-                  )
-                  .map((part, i) => (
-                    <div
-                      key={`file-${i}`}
-                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                    >
-                      <img
-                        src={part.url}
-                        alt="Attachment"
-                        className="max-h-64 rounded-xl border border-kumo-line object-contain"
-                      />
-                    </div>
-                  ))}
-
                 {/* Text parts */}
                 {message.parts
                   .filter((part) => part.type === "text")
@@ -995,54 +652,7 @@ function Chat() {
           }}
           className="max-w-3xl mx-auto px-5 py-4"
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files) addFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-
-          {attachments.length > 0 && (
-            <div className="flex gap-2 mb-2 flex-wrap">
-              {attachments.map((att) => (
-                <div
-                  key={att.id}
-                  className="relative group rounded-lg border border-kumo-line bg-kumo-control overflow-hidden"
-                >
-                  <img
-                    src={att.preview}
-                    alt={att.file.name}
-                    className="h-16 w-16 object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeAttachment(att.id)}
-                    className="absolute top-0.5 right-0.5 rounded-full bg-kumo-contrast/80 text-kumo-inverse p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                    aria-label={`Remove ${att.file.name}`}
-                  >
-                    <XIcon size={10} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="flex items-end gap-3 rounded-xl border border-kumo-line bg-kumo-base p-3 shadow-sm focus-within:ring-2 focus-within:ring-kumo-ring focus-within:border-transparent transition-shadow">
-            <Button
-              type="button"
-              variant="ghost"
-              shape="square"
-              aria-label="Attach images"
-              icon={<PaperclipIcon size={18} />}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!connected || isStreaming}
-              className="mb-0.5"
-            />
             <InputArea
               ref={textareaRef}
               value={input}
@@ -1058,12 +668,7 @@ function Chat() {
                 el.style.height = "auto";
                 el.style.height = `${el.scrollHeight}px`;
               }}
-              onPaste={handlePaste}
-              placeholder={
-                attachments.length > 0
-                  ? "Add a message or send images..."
-                  : "Send a message..."
-              }
+              placeholder={"Send a message..."}
               disabled={!connected || isStreaming}
               rows={1}
               className="flex-1 ring-0! focus:ring-0! shadow-none! bg-transparent! outline-none! resize-none max-h-40"
@@ -1084,9 +689,7 @@ function Chat() {
                 variant="primary"
                 shape="square"
                 aria-label="Send message"
-                disabled={
-                  (!input.trim() && attachments.length === 0) || !connected
-                }
+                disabled={!input.trim() || !connected}
                 icon={<PaperPlaneRightIcon size={18} />}
                 className="mb-0.5"
               />
