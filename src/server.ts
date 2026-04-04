@@ -14,6 +14,15 @@ import { z } from "zod";
 import type { ExecutionContext } from "@cloudflare/workers-types";
 import { getPrivateCvData } from "./private-cv";
 
+function escapeXml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
 /**
  * The AI SDK's downloadAssets step runs `new URL(data)` on every file
  * part's string data. Data URIs parse as valid URLs, so it tries to
@@ -257,6 +266,48 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 export default {
   async fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/robots.txt") {
+      const body = `User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /agents/
+Disallow: /oauth/
+
+Sitemap: ${url.origin}/sitemap.xml
+`;
+
+      return new Response(body, {
+        headers: { "content-type": "text/plain; charset=utf-8" }
+      });
+    }
+
+    if (url.pathname === "/sitemap.xml") {
+      let title = "Portfolio & Resume";
+
+      try {
+        const profile = await getPrivateCvData(env);
+        title = `${profile.name} Portfolio`;
+      } catch {
+        // Keep the sitemap valid even when profile data is unavailable.
+      }
+
+      const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${escapeXml(`${url.origin}/`)}</loc>
+    <lastmod>${new Date().toISOString()}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+<!-- ${escapeXml(title)} -->
+`;
+
+      return new Response(body, {
+        headers: { "content-type": "application/xml; charset=utf-8" }
+      });
+    }
 
     if (url.pathname === "/api/profile") {
       try {

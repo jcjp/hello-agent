@@ -27,6 +27,67 @@ import {
   SunIcon
 } from "@phosphor-icons/react";
 
+const PERSON_JSON_LD_ID = "person-json-ld";
+
+function setHeadTag(
+  selector: `meta[name="${string}"]` | `meta[property="${string}"]`,
+  content: string
+) {
+  const node = document.head.querySelector(selector);
+  if (node) node.setAttribute("content", content);
+}
+
+function updateSeo(profile: PrivateCvData) {
+  const title = `${profile.name} | ${profile.title}`;
+  const summary = `${profile.summary} Based in ${profile.location}.`;
+  const canonicalUrl = `${window.location.origin}/`;
+
+  document.title = title;
+  setHeadTag('meta[name="description"]', summary);
+  setHeadTag('meta[property="og:title"]', title);
+  setHeadTag('meta[property="og:description"]', summary);
+  setHeadTag('meta[property="og:url"]', canonicalUrl);
+  setHeadTag('meta[property="og:site_name"]', `${profile.name} Portfolio`);
+  setHeadTag('meta[name="twitter:title"]', title);
+  setHeadTag('meta[name="twitter:description"]', summary);
+
+  const canonical = document.head.querySelector('link[rel="canonical"]');
+  if (canonical) canonical.setAttribute("href", canonicalUrl);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: profile.name,
+    jobTitle: profile.title,
+    description: profile.summary,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: profile.location
+    },
+    email: `mailto:${profile.email}`,
+    knowsLanguage: profile.languages,
+    alumniOf: profile.education.map((education) => ({
+      "@type": "CollegeOrUniversity",
+      name: education.school
+    })),
+    sameAs: [profile.github, profile.gitlab],
+    knowsAbout: [...profile.coreSkills, ...Object.values(profile.skills).flat()]
+  };
+
+  let script = document.getElementById(PERSON_JSON_LD_ID) as
+    | HTMLScriptElement
+    | null;
+
+  if (!script) {
+    script = document.createElement("script");
+    script.id = PERSON_JSON_LD_ID;
+    script.type = "application/ld+json";
+    document.head.appendChild(script);
+  }
+
+  script.textContent = JSON.stringify(jsonLd);
+}
+
 function ThemeToggle() {
   const [dark, setDark] = useState(
     () => document.documentElement.getAttribute("data-mode") === "dark"
@@ -188,6 +249,7 @@ function Chat() {
         if (!cancelled) {
           setProfile(data as PrivateCvData);
           setProfileError(null);
+          updateSeo(data as PrivateCvData);
         }
       } catch (error) {
         if (!cancelled) {

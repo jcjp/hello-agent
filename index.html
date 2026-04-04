@@ -5,15 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="AI chat agent built with Cloudflare Agents"
+      content="Interactive portfolio and resume website with experience, projects, skills, and contact details."
     />
-    <title>Agent Starter</title>
+    <meta
+      name="keywords"
+      content="portfolio, resume, software engineer, developer, projects, experience, skills"
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Portfolio & Resume" />
+    <meta
+      property="og:description"
+      content="Interactive portfolio and resume website with experience, projects, skills, and contact details."
+    />
+    <meta property="og:url" content="/" />
+    <meta property="og:site_name" content="Portfolio & Resume" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Portfolio & Resume" />
+    <meta
+      name="twitter:description"
+      content="Interactive portfolio and resume website with experience, projects, skills, and contact details."
+    />
+    <title>Portfolio & Resume</title>
     <link rel="icon" href="/favicon.ico" />
     <script>
       (() => {
         const mode = localStorage.getItem("theme") || "light";
         document.documentElement.setAttribute("data-mode", mode);
         document.documentElement.style.colorScheme = mode;
+        const canonical = document.querySelector('link[rel="canonical"]');
+        if (canonical) canonical.href = window.location.origin + "/";
+        const ogUrl = document.querySelector('meta[property="og:url"]');
+        if (ogUrl) ogUrl.content = window.location.origin + "/";
       })();
     </script>
   </head>
