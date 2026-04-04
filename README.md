@@ -8,8 +8,7 @@ of importing it from a committed source file.
 
 - Runs a chat agent on Cloudflare Agents / Workers.
 - Loads private resume data from a Workers KV namespace bound as `PRIVATE_CV`.
-- Uses Workers AI for responses.
-- Supports server tools, browser tools, approvals, and scheduling.
+- Uses Workers AI for streaming chat responses.
 - Keeps the CV out of Git-tracked source files and static client bundle source.
 
 ## Privacy model
@@ -134,9 +133,6 @@ npm run types
 - CV loaded from Workers KV
 - Streaming AI chat responses
 - Browser-provided timezone tool
-- Approval-gated calculator tool
-- Demo weather tool
-- Task scheduling via Agents scheduling APIs
 - WebSocket-backed real-time chat
 - Dark/light theme toggle
 
@@ -174,7 +170,7 @@ payload contains these top-level keys:
 - `certifications`
 - `trainings`
 - `achievements`
-- `keyProjects`
+- `projects`
 
 Invalid JSON or a missing KV value causes the server loader to throw early.
 
