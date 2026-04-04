@@ -12,6 +12,94 @@ body,
   margin: 0;
 }
 
+/* Professional blue theme — Broadridge-inspired navy palette */
+@theme {
+  --color-kumo-accent: light-dark(#0050c8, #5a9cf0);
+  --text-color-kumo-accent: light-dark(#0050c8, #5a9cf0);
+}
+
+:root, [data-theme="kumo"] {
+  /* Backgrounds */
+  --color-kumo-surface: #f2f6fc;
+  --color-kumo-recessed: #e6eef8;
+  --color-kumo-base: #ffffff;
+  --color-kumo-tint: #eaf2fb;
+  --color-kumo-elevated: #f7faff;
+  --color-kumo-overlay: #e6eef8;
+  --color-kumo-control: #ffffff;
+  --color-kumo-fill: #d8e8f8;
+  --color-kumo-fill-hover: #c4d9f2;
+  --color-kumo-interact: #b0cceb;
+
+  /* Brand blue */
+  --color-kumo-brand: #0050c8;
+  --color-kumo-brand-hover: #003f9e;
+
+  /* User chat bubble — deep navy */
+  --color-kumo-contrast: #002060;
+
+  /* Borders & focus */
+  --color-kumo-line: rgba(0, 48, 120, 0.13);
+  --color-kumo-ring: rgba(0, 80, 200, 0.28);
+
+  /* Text */
+  --text-color-kumo-default: #0d1b3e;
+  --text-color-kumo-inverse: #ffffff;
+  --text-color-kumo-strong: #2a3f65;
+  --text-color-kumo-subtle: #4e6a90;
+  --text-color-kumo-inactive: #8ba4c4;
+  --text-color-kumo-placeholder: #8ba4c4;
+  --text-color-kumo-brand: #0050c8;
+  --text-color-kumo-link: #0050c8;
+
+  /* Custom accent (used in app for title/company) */
+  --color-kumo-accent: #0050c8;
+  --text-color-kumo-accent: #0050c8;
+}
+
+:root[data-mode="dark"],
+[data-mode="dark"]:not([data-theme]),
+[data-mode="dark"] [data-theme="kumo"],
+[data-theme="kumo"][data-mode="dark"],
+[data-theme="kumo"] [data-mode="dark"] {
+  /* Backgrounds — deep navy blues */
+  --color-kumo-surface: #050d1c;
+  --color-kumo-recessed: #07101f;
+  --color-kumo-base: #0c1a30;
+  --color-kumo-tint: #112038;
+  --color-kumo-elevated: #070f1e;
+  --color-kumo-overlay: #112038;
+  --color-kumo-control: #091526;
+  --color-kumo-fill: #102040;
+  --color-kumo-fill-hover: #1a2e54;
+  --color-kumo-interact: #1a3060;
+
+  /* Brand — brighter blue for dark mode */
+  --color-kumo-brand: #4a90e2;
+  --color-kumo-brand-hover: #60a4f0;
+
+  /* User chat bubble — medium navy */
+  --color-kumo-contrast: #1a4a9e;
+
+  /* Borders & focus */
+  --color-kumo-line: #162d58;
+  --color-kumo-ring: #1e3a70;
+
+  /* Text */
+  --text-color-kumo-default: #cce0ff;
+  --text-color-kumo-inverse: #ffffff;
+  --text-color-kumo-strong: #a0bcd8;
+  --text-color-kumo-subtle: #7a9cc0;
+  --text-color-kumo-inactive: #3d5a80;
+  --text-color-kumo-placeholder: #3d5a80;
+  --text-color-kumo-brand: #5a9cf0;
+  --text-color-kumo-link: #5a9cf0;
+
+  /* Custom accent */
+  --color-kumo-accent: #5a9cf0;
+  --text-color-kumo-accent: #5a9cf0;
+}
+
 .collapse-content {
   will-change: height;
 }
