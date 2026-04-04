@@ -41,6 +41,7 @@ function updateSeo(profile: PrivateCvData) {
   const title = `${profile.name} | ${profile.title}`;
   const summary = `${profile.summary} Based in ${profile.location}.`;
   const canonicalUrl = `${window.location.origin}/`;
+  const imageUrl = `${window.location.origin}/og-image.png`;
 
   document.title = title;
   setHeadTag('meta[name="description"]', summary);
@@ -48,8 +49,10 @@ function updateSeo(profile: PrivateCvData) {
   setHeadTag('meta[property="og:description"]', summary);
   setHeadTag('meta[property="og:url"]', canonicalUrl);
   setHeadTag('meta[property="og:site_name"]', `${profile.name} Portfolio`);
+  setHeadTag('meta[property="og:image"]', imageUrl);
   setHeadTag('meta[name="twitter:title"]', title);
   setHeadTag('meta[name="twitter:description"]', summary);
+  setHeadTag('meta[name="twitter:image"]', imageUrl);
 
   const canonical = document.head.querySelector('link[rel="canonical"]');
   if (canonical) canonical.setAttribute("href", canonicalUrl);
@@ -60,6 +63,8 @@ function updateSeo(profile: PrivateCvData) {
     name: profile.name,
     jobTitle: profile.title,
     description: profile.summary,
+    url: canonicalUrl,
+    image: imageUrl,
     address: {
       "@type": "PostalAddress",
       addressLocality: profile.location
@@ -74,9 +79,9 @@ function updateSeo(profile: PrivateCvData) {
     knowsAbout: [...profile.coreSkills, ...Object.values(profile.skills).flat()]
   };
 
-  let script = document.getElementById(PERSON_JSON_LD_ID) as
-    | HTMLScriptElement
-    | null;
+  let script = document.getElementById(
+    PERSON_JSON_LD_ID
+  ) as HTMLScriptElement | null;
 
   if (!script) {
     script = document.createElement("script");

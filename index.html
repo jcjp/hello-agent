@@ -21,14 +21,19 @@
     />
     <meta property="og:url" content="/" />
     <meta property="og:site_name" content="Portfolio & Resume" />
+    <meta property="og:image" content="/og-image.png" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="Portfolio & Resume" />
     <meta
       name="twitter:description"
       content="Interactive portfolio and resume website with experience, projects, skills, and contact details."
     />
+    <meta name="twitter:image" content="/og-image.png" />
     <title>Portfolio & Resume</title>
-    <link rel="icon" href="/favicon.ico" />
+    <meta name="theme-color" content="#0b1c31" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/favicon-source.png" />
     <script>
       (() => {
         const mode = localStorage.getItem("theme") || "light";
@@ -38,6 +43,13 @@
         if (canonical) canonical.href = window.location.origin + "/";
         const ogUrl = document.querySelector('meta[property="og:url"]');
         if (ogUrl) ogUrl.content = window.location.origin + "/";
+        const ogImage = document.querySelector('meta[property="og:image"]');
+        if (ogImage) ogImage.content = window.location.origin + "/og-image.png";
+        const twitterImage = document.querySelector(
+          'meta[name="twitter:image"]'
+        );
+        if (twitterImage)
+          twitterImage.content = window.location.origin + "/og-image.png";
       })();
     </script>
   </head>

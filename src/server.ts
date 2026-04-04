@@ -12,7 +12,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import type { ExecutionContext } from "@cloudflare/workers-types";
-import { getPrivateCvData } from "./private-cv";
+import { getPrivateCvData, type PrivateCvData } from "./private-cv";
 
 function escapeXml(value: string): string {
   return value
@@ -21,6 +21,129 @@ function escapeXml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&apos;");
+}
+
+function escapeHtml(value: string): string {
+  return escapeXml(value);
+}
+
+function buildSiteMetadata(profile: PrivateCvData | null, url: URL) {
+  const canonicalUrl = `${url.origin}/`;
+  const imageUrl = `${url.origin}/og-image.png`;
+
+  if (!profile) {
+    const title = "Portfolio & Resume";
+    const description =
+      "Interactive portfolio and resume website with experience, projects, skills, and contact details.";
+
+    return {
+      title,
+      description,
+      canonicalUrl,
+      imageUrl,
+      siteName: title
+    };
+  }
+
+  return {
+    title: `${profile.name} | ${profile.title}`,
+    description: `${profile.summary} Based in ${profile.location}.`,
+    canonicalUrl,
+    imageUrl,
+    siteName: `${profile.name} Portfolio`
+  };
+}
+
+function buildSeoPreviewMarkup(profile: PrivateCvData | null) {
+  if (!profile) {
+    return `
+      <main style="font-family: ui-sans-serif, system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 48px 24px; line-height: 1.6; color: #0f172a;">
+        <h1 style="font-size: 2rem; margin: 0 0 12px;">Portfolio & Resume</h1>
+        <p style="margin: 0; font-size: 1rem;">
+          Interactive portfolio and resume website with experience, projects, skills, and contact details.
+        </p>
+      </main>
+    `;
+  }
+
+  const topSkills = [
+    ...profile.coreSkills,
+    ...Object.values(profile.skills).flat()
+  ]
+    .filter((value, index, list) => list.indexOf(value) === index)
+    .slice(0, 12);
+  const topProjects = profile.keyProjects.slice(0, 3);
+  const topExperience = profile.experience.slice(0, 2);
+
+  const skillItems = topSkills
+    .map((skill) => `<li>${escapeHtml(skill)}</li>`)
+    .join("");
+  const projectItems = topProjects
+    .map(
+      (project) =>
+        `<article><h3 style="margin: 0 0 4px; font-size: 1rem;">${escapeHtml(project.name)}</h3><p style="margin: 0;">${escapeHtml(project.description)}</p></article>`
+    )
+    .join("");
+  const experienceItems = topExperience
+    .map(
+      (experience) =>
+        `<article><h3 style="margin: 0 0 4px; font-size: 1rem;">${escapeHtml(experience.title)} at ${escapeHtml(experience.company)}</h3><p style="margin: 0 0 4px; color: #475569;">${escapeHtml(experience.period)}</p><p style="margin: 0;">${escapeHtml(experience.highlights.join(" • "))}</p></article>`
+    )
+    .join("");
+
+  return `
+    <main style="font-family: ui-sans-serif, system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 48px 24px; line-height: 1.6; color: #0f172a;">
+      <header style="margin-bottom: 28px;">
+        <p style="margin: 0 0 8px; font-size: 0.875rem; letter-spacing: 0.08em; text-transform: uppercase; color: #2563eb;">Portfolio</p>
+        <h1 style="font-size: 2.5rem; line-height: 1.1; margin: 0 0 12px;">${escapeHtml(profile.name)}</h1>
+        <p style="font-size: 1.125rem; margin: 0 0 8px;">${escapeHtml(profile.title)}</p>
+        <p style="margin: 0 0 16px; color: #475569;">${escapeHtml(profile.location)}</p>
+        <p style="margin: 0;">${escapeHtml(profile.summary)}</p>
+      </header>
+      <section style="margin-bottom: 24px;">
+        <h2 style="font-size: 1.25rem; margin: 0 0 12px;">Selected Experience</h2>
+        <div style="display: grid; gap: 16px;">${experienceItems}</div>
+      </section>
+      <section style="margin-bottom: 24px;">
+        <h2 style="font-size: 1.25rem; margin: 0 0 12px;">Key Skills</h2>
+        <ul style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 16px; padding-left: 20px; margin: 0;">${skillItems}</ul>
+      </section>
+      <section style="margin-bottom: 24px;">
+        <h2 style="font-size: 1.25rem; margin: 0 0 12px;">Featured Projects</h2>
+        <div style="display: grid; gap: 16px;">${projectItems}</div>
+      </section>
+      <section>
+        <h2 style="font-size: 1.25rem; margin: 0 0 12px;">Contact</h2>
+        <p style="margin: 0;">Email: <a href="mailto:${escapeHtml(profile.email)}">${escapeHtml(profile.email)}</a></p>
+        <p style="margin: 4px 0 0;">GitHub: <a href="${escapeHtml(profile.github)}">${escapeHtml(profile.github)}</a></p>
+        <p style="margin: 4px 0 0;">GitLab: <a href="${escapeHtml(profile.gitlab)}">${escapeHtml(profile.gitlab)}</a></p>
+      </section>
+    </main>
+  `;
+}
+
+function buildPersonJsonLd(profile: PrivateCvData, url: URL) {
+  return JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Person",
+    name: profile.name,
+    jobTitle: profile.title,
+    description: profile.summary,
+    url: `${url.origin}/`,
+    image: `${url.origin}/og-image.png`,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: profile.location
+    },
+    email: `mailto:${profile.email}`,
+    knowsLanguage: profile.languages,
+    alumniOf: profile.education.map((education) => ({
+      "@type": "CollegeOrUniversity",
+      name: education.school
+    })),
+    sameAs: [profile.github, profile.gitlab],
+    knowsAbout: [...profile.coreSkills, ...Object.values(profile.skills).flat()]
+  });
 }
 
 /**
@@ -266,6 +389,104 @@ If the user asks to schedule a task, use the schedule tool to schedule the task.
 export default {
   async fetch(request: Request, env: Env, _ctx?: ExecutionContext) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/") {
+      const assetResponse = await env.ASSETS.fetch(request);
+      const contentType = assetResponse.headers.get("content-type") || "";
+
+      if (!contentType.includes("text/html")) {
+        return assetResponse;
+      }
+
+      let profile: PrivateCvData | null = null;
+
+      try {
+        profile = await getPrivateCvData(env);
+      } catch {
+        // Fall back to generic SEO metadata when profile data is unavailable.
+      }
+
+      const metadata = buildSiteMetadata(profile, url);
+      const rewriter = new HTMLRewriter()
+        .on("title", {
+          text(text) {
+            text.replace(metadata.title);
+          }
+        })
+        .on('meta[name="description"]', {
+          element(element) {
+            element.setAttribute("content", metadata.description);
+          }
+        })
+        .on('meta[property="og:title"]', {
+          element(element) {
+            element.setAttribute("content", metadata.title);
+          }
+        })
+        .on('meta[property="og:description"]', {
+          element(element) {
+            element.setAttribute("content", metadata.description);
+          }
+        })
+        .on('meta[property="og:url"]', {
+          element(element) {
+            element.setAttribute("content", metadata.canonicalUrl);
+          }
+        })
+        .on('meta[property="og:site_name"]', {
+          element(element) {
+            element.setAttribute("content", metadata.siteName);
+          }
+        })
+        .on('meta[property="og:image"]', {
+          element(element) {
+            element.setAttribute("content", metadata.imageUrl);
+          }
+        })
+        .on('meta[name="twitter:title"]', {
+          element(element) {
+            element.setAttribute("content", metadata.title);
+          }
+        })
+        .on('meta[name="twitter:description"]', {
+          element(element) {
+            element.setAttribute("content", metadata.description);
+          }
+        })
+        .on('meta[name="twitter:image"]', {
+          element(element) {
+            element.setAttribute("content", metadata.imageUrl);
+          }
+        })
+        .on('link[rel="canonical"]', {
+          element(element) {
+            element.setAttribute("href", metadata.canonicalUrl);
+          }
+        })
+        .on("#root", {
+          element(element) {
+            element.setInnerContent(
+              `<div id="seo-preview" style="position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0;">${buildSeoPreviewMarkup(profile)}</div>`,
+              {
+                html: true
+              }
+            );
+          }
+        });
+
+      if (profile) {
+        rewriter.on("head", {
+          element(element) {
+            element.append(
+              `<script id="person-json-ld" type="application/ld+json">${buildPersonJsonLd(profile, url)}</script>`,
+              { html: true }
+            );
+          }
+        });
+      }
+
+      return rewriter.transform(assetResponse);
+    }
 
     if (url.pathname === "/robots.txt") {
       const body = `User-agent: *
