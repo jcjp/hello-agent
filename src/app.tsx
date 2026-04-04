@@ -291,11 +291,11 @@ function Chat() {
                       <p className="text-sm text-kumo-accent font-semibold">
                         {profile.title}
                       </p>
-                      <p className="text-xs text-kumo-inactive mt-1">
+                      <p className="text-xs text-kumo-subtle mt-1">
                         {profile.location}
                       </p>
 
-                      <div className="flex gap-3 text-xs text-kumo-inactive mt-2">
+                      <div className="flex gap-3 text-xs text-kumo-subtle mt-2">
                         <a
                           href={`mailto:${profile.email}`}
                           className="hover:text-kumo-accent transition"
@@ -487,10 +487,10 @@ function Chat() {
                           {profile.education[0].field &&
                             ` in ${profile.education[0].field}`}
                         </p>
-                        <p className="text-kumo-inactive">
+                        <p className="text-kumo-subtle">
                           {profile.education[0].school}
                         </p>
-                        <p className="text-kumo-subtle">
+                        <p className="text-kumo-default/80">
                           {profile.education[0].year}
                         </p>
                       </div>
