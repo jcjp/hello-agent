@@ -502,43 +502,70 @@ function Chat() {
                       <AnimatedToggleContent
                         expanded={showAllExperience}
                         collapsedContent={
-                          <div className="space-y-2">
-                            {profile.experience.slice(0, 3).map((exp) => (
-                              <div
-                                key={exp.company + exp.period}
-                                className="text-xs"
-                              >
-                                <p className="font-semibold text-kumo-default">
-                                  {exp.title}
-                                </p>
-                                <p className="text-kumo-accent">
-                                  {exp.company}
-                                </p>
-                                <p className="text-kumo-subtle text-xs">
-                                  {exp.period}
-                                </p>
-                              </div>
-                            ))}
+                          <div className="space-y-3">
+                            {profile.experience.slice(0, 3).map((exp) => {
+                              const key = exp.company + exp.period;
+                              const firstHighlight = exp.highlights[0] || "";
+                              const summary =
+                                firstHighlight.length > 150
+                                  ? firstHighlight.slice(0, 150) + "..."
+                                  : firstHighlight;
+
+                              return (
+                                <div key={key} className="text-xs">
+                                  <p className="font-semibold text-kumo-default">
+                                    {exp.title}
+                                  </p>
+                                  <p className="text-kumo-accent">
+                                    {exp.company}
+                                  </p>
+                                  <p className="text-kumo-subtle text-xs mb-1">
+                                    {exp.period}
+                                  </p>
+                                  {exp.highlights.length > 0 && (
+                                    <div className="mt-1.5">
+                                      <p className="text-kumo-subtle">
+                                        {summary}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         }
                         expandedContent={
-                          <div className="space-y-2">
-                            {profile.experience.map((exp) => (
-                              <div
-                                key={exp.company + exp.period}
-                                className="text-xs"
-                              >
-                                <p className="font-semibold text-kumo-default">
-                                  {exp.title}
-                                </p>
-                                <p className="text-kumo-accent">
-                                  {exp.company}
-                                </p>
-                                <p className="text-kumo-subtle text-xs">
-                                  {exp.period}
-                                </p>
-                              </div>
-                            ))}
+                          <div className="space-y-3">
+                            {profile.experience.map((exp) => {
+                              const key = exp.company + exp.period;
+
+                              return (
+                                <div key={key} className="text-xs">
+                                  <p className="font-semibold text-kumo-default">
+                                    {exp.title}
+                                  </p>
+                                  <p className="text-kumo-accent">
+                                    {exp.company}
+                                  </p>
+                                  <p className="text-kumo-subtle text-xs mb-1">
+                                    {exp.period}
+                                  </p>
+                                  {exp.highlights.length > 0 && (
+                                    <div className="mt-1.5">
+                                      <ul className="list-disc list-inside space-y-1 text-kumo-subtle">
+                                        {exp.highlights.map(
+                                          (highlight, idx) => (
+                                            <li key={idx} className="text-xs">
+                                              {highlight}
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         }
                       />

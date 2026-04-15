@@ -18,7 +18,8 @@ body,
   --text-color-kumo-accent: light-dark(#0050c8, #5a9cf0);
 }
 
-:root, [data-theme="kumo"] {
+:root,
+[data-theme="kumo"] {
   /* Backgrounds */
   --color-kumo-surface: #f2f6fc;
   --color-kumo-recessed: #e6eef8;
