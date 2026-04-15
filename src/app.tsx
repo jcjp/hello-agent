@@ -552,11 +552,12 @@ function Chat() {
                                   </p>
                                   {exp.highlights.length > 0 && (
                                     <div className="mt-1.5">
-                                      <ul className="list-disc list-inside space-y-1 text-kumo-subtle">
+                                      <ul className="space-y-1 text-kumo-subtle">
                                         {exp.highlights.map(
                                           (highlight, idx) => (
-                                            <li key={idx} className="text-xs">
-                                              {highlight}
+                                            <li key={idx} className="text-xs flex gap-1.5">
+                                              <span className="text-kumo-subtle flex-shrink-0">•</span>
+                                              <span className="flex-1">{highlight}</span>
                                             </li>
                                           )
                                         )}
